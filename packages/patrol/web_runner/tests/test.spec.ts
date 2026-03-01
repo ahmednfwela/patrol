@@ -62,6 +62,13 @@ for (const { name, skip, tags } of tests) {
     })
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    await page.evaluate(async name => await window.__patrol__runTest!(name), name)
+    const result = await page.evaluate(async name => await window.__patrol__runTest!(name), name)
+    if (result.result === "failure") {
+      throw new Error(`Test "${name}" failed:\n${result.details}`)
+    }
+    
+    // Close the page *after* retrieving the result to ensure it gets fully torn
+    // down before the next test spins up a new page context.
+    await page.close()
   })
 }
