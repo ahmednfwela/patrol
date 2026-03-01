@@ -32,8 +32,8 @@ async function setup(config: FullConfig) {
     window.__patrol__isInitialised = true
   })
 
-  // Use "domcontentloaded" to avoid hanging on large WASM apps where the
-  // "load" event can be delayed by many minutes.
+  // We want to initialize the platform handler and things *before* we potentially miss the boat
+  // during load.
   await page.goto(baseURL, { waitUntil: "domcontentloaded" })
 
   await initialise(page)

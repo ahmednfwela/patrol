@@ -37,13 +37,10 @@ export const patrolTest = base.extend({
       window.__patrol__isInitialised = true
     })
 
-    // Use "domcontentloaded" instead of "load" — Flutter WASM initialization
-    // can delay the "load" event by many minutes on large apps. By the time
-    // domcontentloaded fires, Playwright can set __patrol__isInitialised before
-    // Flutter's Dart code even starts, avoiding the race condition entirely.
-    await page.goto("/", { waitUntil: "domcontentloaded" })
-
     await exposePatrolPlatformHandler(page)
+
+    // Go to the page and wait for domcontentloaded before we start injecting things
+    await page.goto("/", { waitUntil: "domcontentloaded" })
 
     await initialise(page)
 
