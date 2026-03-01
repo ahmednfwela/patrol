@@ -443,6 +443,7 @@ class WebTestBackend {
               ['npx', 'playwright', 'test', 'tests/test.spec.ts'],
               workingDirectory: webRunnerPath,
               environment: {
+                ...Platform.environment,
                 'BASE_URL': baseUrl,
                 'PATROL_TEST_RESULTS_DIR': testResultsDir,
                 'PATROL_TEST_REPORT_DIR': testReportDir,
@@ -478,7 +479,8 @@ class WebTestBackend {
                   'PATROL_WEB_SHARD': options.shard.toString(),
                 if (options.headless != null)
                   'PATROL_WEB_HEADLESS': options.headless.toString(),
-                ...Platform.environment,
+                if (options.initTimeout != null)
+                  'PATROL_WEB_INIT_TIMEOUT': options.initTimeout.toString(),
               },
               runInShell: true,
             )
@@ -503,7 +505,7 @@ class WebTestBackend {
               .transform(const SystemEncoding().decoder)
               .transform(const LineSplitter())
               .listen((line) {
-                _logger.detail('Playwright stderr: $line');
+                _logger.info('Playwright stderr: $line');
               })
             ..disposedBy(scope);
 

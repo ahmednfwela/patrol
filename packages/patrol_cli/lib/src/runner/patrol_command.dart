@@ -341,6 +341,14 @@ abstract class PatrolCommand extends Command<int> {
             'Maximum time in seconds to wait for the Flutter web server to start. '
             'Defaults to 120 (2 minutes).',
         valueHelp: 'number',
+      )
+      ..addOption(
+        'web-init-timeout',
+        help:
+            'Maximum time in milliseconds to wait for the Flutter/Dart app to '
+            'signal it is ready to Playwright. '
+            'Defaults to 120000 (2 minutes).',
+        valueHelp: 'number',
       );
   }
 

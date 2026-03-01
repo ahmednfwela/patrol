@@ -316,6 +316,7 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
       shard: stringArg('web-shard'),
       headless: stringArg('web-headless'),
       serverTimeout: intArg('web-server-timeout'),
+      initTimeout: intArg('web-init-timeout'),
     );
 
     // No need to build web app for testing. It's done in the execute method.

@@ -23,7 +23,17 @@ export const patrolTest = base.extend({
       console.log(`Playwright: ${text}`)
     })
 
-    await page.goto("/", { waitUntil: "load" })
+    page.on("pageerror", error => {
+      error.message = `Page error during test: ${error.message}`
+      // eslint-disable-next-line no-console
+      console.error(error.stack ?? error.message)
+    })
+
+    // Use "domcontentloaded" instead of "load" — Flutter WASM initialization
+    // can delay the "load" event by many minutes on large apps. By the time
+    // domcontentloaded fires, Playwright can set __patrol__isInitialised before
+    // Flutter's Dart code even starts, avoiding the race condition entirely.
+    await page.goto("/", { waitUntil: "domcontentloaded" })
 
     await exposePatrolPlatformHandler(page)
 
