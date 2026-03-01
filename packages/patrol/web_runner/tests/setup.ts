@@ -1,5 +1,6 @@
 import { chromium, type FullConfig } from "@playwright/test"
 import { initialise } from "./initialise"
+import { exposePatrolPlatformHandler } from "./patrolPlatformHandler"
 import { DartTestEntry, PatrolTestEntry } from "./types"
 
 async function setup(config: FullConfig) {
@@ -34,7 +35,6 @@ async function setup(config: FullConfig) {
 
   // Expose platform handler bindings before navigation to prevent race condition
   // during Flutter booting/initialization logic
-  const { exposePatrolPlatformHandler } = await import('./patrolPlatformHandler')
   await exposePatrolPlatformHandler(page)
 
   // We want to initialize the platform handler and things *before* we potentially miss the boat
