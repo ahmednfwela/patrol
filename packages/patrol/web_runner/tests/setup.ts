@@ -26,7 +26,15 @@ async function setup(config: FullConfig) {
     })
   })
 
-  await page.goto(baseURL)
+  // Register an init script so __patrol__isInitialised is set before any
+  // page script runs, surviving any page reload during WASM bootstrapping.
+  await page.addInitScript(() => {
+    window.__patrol__isInitialised = true
+  })
+
+  // Use "domcontentloaded" to avoid hanging on large WASM apps where the
+  // "load" event can be delayed by many minutes.
+  await page.goto(baseURL, { waitUntil: "domcontentloaded" })
 
   await initialise(page)
 

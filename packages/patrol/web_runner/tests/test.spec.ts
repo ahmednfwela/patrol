@@ -29,6 +29,14 @@ export const patrolTest = base.extend({
       console.error(error.stack ?? error.message)
     })
 
+    // Register an init script that runs at the very start of every page load,
+    // BEFORE any Flutter / WASM code executes.  This guarantees that
+    // __patrol__isInitialised is true even if the page reloads during WASM
+    // bootstrapping (service-worker activation, Flutter engine reinit, etc.).
+    await page.addInitScript(() => {
+      window.__patrol__isInitialised = true
+    })
+
     // Use "domcontentloaded" instead of "load" — Flutter WASM initialization
     // can delay the "load" event by many minutes on large apps. By the time
     // domcontentloaded fires, Playwright can set __patrol__isInitialised before
