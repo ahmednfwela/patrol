@@ -413,6 +413,7 @@ class WebAppOptions {
     this.webPort,
     this.serverTimeout,
     this.browserArgs,
+    this.initTimeout,
   });
 
   final FlutterAppOptions flutter;
@@ -438,10 +439,6 @@ class WebAppOptions {
   final String? headless;
   final int? webPort;
   final String? browserArgs;
-
-  /// Timeout in seconds for the web server to start.
-  /// Defaults to 120 seconds (2 minutes) if not specified.
-  final int? serverTimeout;
 
   /// Timeout in seconds for the web server to start.
   /// Defaults to 120 seconds (2 minutes) if not specified.
