@@ -1,8 +1,22 @@
 ## Unreleased
 
+- Fix `tapOnNotification` on iOS physical devices to Open button when tapping on notification. (#2972)
+- Fix `takeCameraPhoto` do not accept location permission dialog on Pixel physical devices. (#2972)
+- Fix `takeCameraPhoto` on Android to use fallback button if done button is not visible. (#2974)
+- Reflect failed tests in Playwright report. (#2970)
+- Add `stopMockLocation` method to `PlatformAutomator` and make mockLocation method less flaky (#2937)
+
+
+## 4.3.0
+
+- Fix WASM compatibility by migrating conditional imports from `dart.library.html` to `dart.library.js_interop`. (#2960)
+
+## 4.2.0
+
 - Improve setup error reporting for Patrol Web failures. (#2928)
 - Fix `tapOnNotificationByIndex` and `getNotifications` on iOS 18+ to use consistent indexing with other systems. (#2899)
 - Fix Android native automator error logs to use `AndroidAutomatorClientException` instead of `IosAutomatorClientException`.
+- Allow to pass additional web browser args through `web-browser-args`. (#2932)
 
 # 4.1.1
 

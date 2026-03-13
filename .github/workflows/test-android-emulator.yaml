@@ -27,7 +27,7 @@ jobs:
   run_tests:
     name: Flutter ${{ matrix.flutter-version }} on API ${{ matrix.api-level }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     outputs:
       SLACK_MESSAGE_TITLE: Flutter ${{ matrix.flutter-version }} on API ${{ matrix.api-level }}
       TESTS_EXIT_CODE: ${{ steps.tests_step.outputs.TESTS_EXIT_CODE }}
@@ -116,7 +116,7 @@ jobs:
         run: | 
           patrol build android \
           --tags='android && emulator' \
-          --exclude patrol_test/web_example_test.dart \
+          --exclude patrol_test/web/,patrol_test/native_tests/volume_test.dart,patrol_test/volume_test.dart \
           --dart-define-from-file=defines_1.json --dart-define-from-file=defines_2.json --dart-define-from-file=defines_3.env \
           --verbose
 

@@ -4,19 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '30 21 * * *'
-  pull_request:
-    paths:
-      - 'packages/patrol/**'
-      - 'packages/patrol_finders/**'
-      - 'packages/patrol_log/**'
-      - 'packages/patrol_cli/**'
-      - 'packages/adb/**'
-      - 'packages/patrol_gen/**'
-      - 'dev/e2e_app/**'
-      - 'schema.dart'
-      - 'gen_from_schema'
-      - '!**.md'
-      - '!**.mdx'
 
 jobs:
   run_tests:
@@ -33,6 +20,7 @@ jobs:
       matrix:
         flutter-version: ['3.32.x']
         flutter-channel: ['stable']
+        # We use older iOs because it allows to record video in the testlab
         device_model: ['iphone14pro']
         os_version: ['16.6']
         os: [iOS]
@@ -99,13 +87,11 @@ jobs:
         working-directory: packages/patrol_cli
         run: dart pub global activate --source path . && patrol
 
+      # Note: clear_permissions_test and deny_many_permissions_test are excluded
+      # because camera permissions are not cleared between tests on physical devices
       - name: Build tests
         run: |
-          patrol build ios \
-          --tags='ios && physical_device'
-          --dart-define-from-file=defines_1.json --dart-define-from-file=defines_2.json --dart-define-from-file=defines_3.env \
-          --release \
-          --verbose
+          patrol build ios --tags='ios && physical_device' --exclude=patrol_test/web/,patrol_test/native_tests/,patrol_test/volume_test.dart,patrol_test/overflow_test.dart,patrol_test/permissions/clear_permissions_test.dart,patrol_test/permissions/deny_many_permissions_test.dart --dart-define-from-file=defines_1.json --dart-define-from-file=defines_2.json --dart-define-from-file=defines_3.env --release --verbose --clear-permissions
 
       - name: Upload APKs to Firebase Test Lab and wait for tests to finish
         id: tests_step

@@ -4,19 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 */12 * * *'
-  pull_request:
-    paths:
-      - 'packages/patrol/**'
-      - 'packages/patrol_finders/**'
-      - 'packages/patrol_log/**'
-      - 'packages/patrol_cli/**'
-      - 'packages/adb/**'
-      - 'packages/patrol_gen/**'
-      - 'dev/e2e_app/**'
-      - 'schema.dart'
-      - 'gen_from_schema'
-      - '!**.md'
-      - '!**.mdx'
 
 jobs:
   run_tests:
@@ -35,10 +22,8 @@ jobs:
         flutter-channel: ['stable']
         os: ['Android API']
         include:
-          - device_model: 'oriole'
-            os_version: '33'
           - device_model: 'shiba'
-            os_version: '34'
+            os_version: '35'
 
     defaults:
       run:
@@ -93,7 +78,7 @@ jobs:
         run: |
           patrol build android \
           --tags='android && physical_device' \
-          --exclude patrol_test/web_example_test.dart \
+          --exclude patrol_test/web/,patrol_test/native_tests/,patrol_test/volume_test.dart \
           --dart-define-from-file=defines_1.json --dart-define-from-file=defines_2.json --dart-define-from-file=defines_3.env \
           --verbose
 

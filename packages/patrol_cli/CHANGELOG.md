@@ -1,8 +1,16 @@
 ## Unreleased
 
+- Reflect failed tests in Playwright report. (#2970)
+
+## 4.2.0
+
+- Add support for `--web-port` option to specify the port for the web server when running web tests with `patrol test`. (#2832)
 - Add `--web-server-timeout` flag to configure the web server startup timeout (default: 120s). (#2948)
 - Fix running devtools after moving test to `patrol_test/`. (#2922) 
 - Fix listen to stdout/stderr streams in buildApkConfigOnly to prevent hang on Windows. (#2905)
+- Fix bug that --exclude was not working for directories. (#2918)
+- Allow to pass additional web browser args through `web-browser-args`. (#2932) 
+- Correctly compose devtools link on new Flutter version. (#2957)
 
 ## 4.1.0
 

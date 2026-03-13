@@ -643,7 +643,8 @@
         let cellsQuery = self.springboard.buttons.matching(
           identifier: self.notificationCellIdentifier)
         guard
-          let cell = self.waitFor(query: cellsQuery, index: adjustedIndex, timeout: timeout ?? self.timeout)
+          let cell = self.waitFor(
+            query: cellsQuery, index: adjustedIndex, timeout: timeout ?? self.timeout)
         else {
           throw PatrolError.viewNotExists("notification at index \(index)")
         }
@@ -654,7 +655,13 @@
           cell.doubleTap()
           self.springboard.buttons.matching(identifier: open).firstMatch.tap()
         } else {
+          // Physical devices may also require tapping "open" button (e.g., with Face ID)
           cell.tap()
+          let open = try Localization.getLocalizedString(key: "open")
+          let openButton = self.springboard.buttons.matching(identifier: open).firstMatch
+          if openButton.exists {
+            openButton.tap()
+          }
         }
       }
     }
@@ -679,7 +686,13 @@
           cell.doubleTap()
           self.springboard.buttons.matching(identifier: open).firstMatch.tap()
         } else {
+          // Physical devices may also require tapping "open" button (e.g., with Face ID)
           cell.tap()
+          let open = try Localization.getLocalizedString(key: "open")
+          let openButton = self.springboard.buttons.matching(identifier: open).firstMatch
+          if openButton.exists {
+            openButton.tap()
+          }
         }
       }
     }
@@ -869,6 +882,14 @@
         runAction("setting mock location to \(latitude), \(longitude)") {
           XCUIDevice.shared.location = XCUILocation(
             location: CLLocation(latitude: latitude, longitude: longitude))
+        }
+      }
+    }
+
+    func stopMockLocation() throws {
+      if #available(iOS 16.4, *) {
+        runAction("stopping mock location") {
+          XCUIDevice.shared.location = nil
         }
       }
     }
