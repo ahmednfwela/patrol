@@ -15,6 +15,30 @@ export async function initialise(page: Page) {
     window.__patrol__isInitialised = true
   })
 
+  // In DDC debug mode (Flutter 3.41+ / Dart 3.11+, DWDS 26.x), the bootstrap
+  // creates window.$dartRunMain() and waits for DWDS to call it. DWDS only
+  // does this for the first browser connection; subsequent page loads (e.g. the
+  // test phase after setup closes) never get the "run main" signal.
+  //
+  // Detect this and call $dartRunMain ourselves if DWDS hasn't.
+  try {
+    logger.info("Waiting for DDC module loading to complete...")
+    await page.waitForFunction(
+      () => typeof window.$dartRunMain === "function",
+      { timeout: initTimeout },
+    )
+
+    const dartMainAlreadyRan = await page.evaluate(() => !!window.$dartMainExecuted)
+    if (!dartMainAlreadyRan) {
+      logger.info("DWDS did not call $dartRunMain — invoking it manually")
+      await page.evaluate(() => window.$dartRunMain!())
+    }
+  } catch {
+    // $dartRunMain may not exist in release/profile builds or WASM — that's fine,
+    // the Dart entrypoint runs automatically in those modes.
+    logger.info("No $dartRunMain found (non-DDC build?) — continuing")
+  }
+
   logger.info("Waiting for Flutter/Dart to set __patrol__onInitialised (timeout: %dms)...", initTimeout)
 
   // Log periodic progress so the user knows we are still waiting for WASM.
