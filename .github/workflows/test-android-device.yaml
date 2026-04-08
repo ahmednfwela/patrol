@@ -3,7 +3,8 @@ name: test android device
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */12 * * *'
+    # run this workflow weekly on Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
 
 jobs:
   run_tests:
@@ -18,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flutter-version: ['3.32.x']
+        flutter-version: ['3.38.x']
         flutter-channel: ['stable']
         os: ['Android API']
         include:

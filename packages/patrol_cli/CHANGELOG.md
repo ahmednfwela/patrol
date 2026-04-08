@@ -1,5 +1,11 @@
-## Unreleased
+## 4.3.1
 
+- Update dependencies.
+
+## 4.3.0
+
+- Bump `patrol_log` to `^0.8.0`.
+- Refactor develop command into reusable components and expose public API for programmatic usage.
 - Reflect failed tests in Playwright report. (#2970)
 
 ## 4.2.0
