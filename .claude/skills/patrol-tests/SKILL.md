@@ -5,14 +5,14 @@ description: Rules for writing Patrol E2E tests in Flutter apps
 
 # Order of actions when writing new tests
 
-1. Read provided test steps
-2. Inspect existing test code for functions that can be reused
-3. Also think if one of existing functions can be adjusted to match its existing usage and new test
-4. Assign test keys to required elements if they are not assigned yet
-5. Start writing test: reuse existing functions + put new test steps in new test file
-6. Write patrol actions directly in the test file, do not create new methods
+1. Inspect existing test code for functions that can be reused
+2. Also think if one of existing functions can be adjusted to match its existing usage and new test
+3. Assign test keys to required elements if they are not assigned yet
+4. Start writing test: reuse existing functions + put new test steps in new test file
+5. Write patrol actions directly in the test file, do not create new methods
+6. Run the test frequently during development — don't wait until the full test is written. Run after completing each logical group of steps to catch failures early
 7. After full test passes, reorganize new code into reusable functions
-8. Recheck the test after finishing
+8. Rerun the test after reorganizing to confirm it still passes
 
 # Patrol MCP Usage
 
