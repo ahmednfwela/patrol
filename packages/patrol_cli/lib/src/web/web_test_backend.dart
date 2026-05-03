@@ -490,8 +490,6 @@ class WebTestBackend {
                   'PATROL_WEB_INIT_TIMEOUT': options.initTimeout.toString(),
                 if (options.browserArgs != null)
                   'PATROL_WEB_BROWSER_ARGS': options.browserArgs.toString(),
-                ...Platform.environment,
-
               },
               runInShell: true,
             )
@@ -577,12 +575,12 @@ class WebTestBackend {
       ['npx', 'ts-node', 'tests/develop.ts'],
       workingDirectory: webRunnerPath,
       environment: {
+        ...Platform.environment,
         'DEBUGGER_PORT': port,
         'PATROL_TEST_RESULTS_DIR': testResultsDir,
         'PATROL_TEST_REPORT_DIR': testReportDir,
         'PATROL_WEB_JSON_OUTPUT_NAME': 'results.json',
         'PATROL_WEB_JSON_OUTPUT_DIR': testReportDir,
-        ...Platform.environment,
       },
       runInShell: true,
     );
