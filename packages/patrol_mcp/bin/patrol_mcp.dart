@@ -8,9 +8,10 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:patrol_mcp/src/native_tree_service.dart';
 import 'package:patrol_mcp/src/patrol_session.dart';
 import 'package:patrol_mcp/src/screenshot_service.dart';
+import 'package:patrol_mcp/src/video_encoder.dart';
 
 /// Version of patrol_mcp. Must be kept in sync with pubspec.yaml.
-const version = '0.1.3';
+const version = '0.2.0';
 
 const double _defaultTimeoutMinutes = 5;
 
@@ -98,18 +99,21 @@ Future<int> main(List<String> args) async {
               instructions:
                   'Patrol MCP lets AI agents run and control Patrol develop sessions.\n\n'
                   'Usage workflow:\n'
-                  '1. Use run with testFile (for example: {"testFile":"patrol_test/your_test.dart"}) '
-                  'to start a test run.\n'
-                  '2. Use screenshot to capture the current app screen.\n'
-                  '3. Use native-tree to fetch the current native UI tree '
-                  '(requires an active session/device).\n'
-                  '4. Use quit to gracefully stop the active session when done.\n\n'
+                  '1. Use run with testFile to start a test run.\n'
+                  '2. Use screenshot to capture the current app screen '
+                  '(works on Android, iOS, and Web via CDP).\n'
+                  '3. Use native-tree to fetch the current native UI tree.\n'
+                  '4. For web sessions: use start-recording/stop-recording '
+                  'to capture animated GIFs.\n'
+                  '5. Use quit to gracefully stop the active session when done.\n\n'
                   'Behavior notes:\n'
                   '- run waits for test completion.\n'
-                  '- If no session is running, run starts a new session.\n'
-                  '- If a session is already running, run triggers a restart for the requested test.\n'
-                  '- status is optional and mainly useful for debugging session state and recent output.\n'
-                  '- native-tree is intended for native interactions and cross-app/native context inspection.',
+                  '- screenshot auto-detects the platform. '
+                  'For web, it uses Chrome DevTools Protocol.\n'
+                  '- start-recording/stop-recording only work for web sessions. '
+                  'Recording auto-stops after 30 seconds.\n'
+                  '- status is optional and mainly useful for debugging.\n'
+                  '- native-tree is for native interactions and cross-app inspection.',
             ),
           )
           ..registerTool(
@@ -181,6 +185,8 @@ Future<int> main(List<String> args) async {
             callback: (args, extra) {
               return ScreenshotService.handleScreenshotRequest(
                 patrolSession.device,
+                webDebuggerPort: patrolSession.webDebuggerPort,
+                cdpService: patrolSession.cdpService,
               );
             },
           )
@@ -198,6 +204,126 @@ Future<int> main(List<String> args) async {
                 patrolSession.device,
                 patrolSession.testServerPort,
               );
+            },
+          )
+          ..registerTool(
+            'start-recording',
+            description:
+                'Start recording the web browser screen via CDP screencast. '
+                'Only works for web sessions. '
+                'Recording auto-stops after 30 seconds or 150 frames.',
+            annotations: const ToolAnnotations(title: 'Start Recording'),
+            callback: (args, extra) async {
+              final cdp = patrolSession.cdpService;
+              if (cdp == null) {
+                return const CallToolResult(
+                  content: [
+                    TextContent(
+                      text: 'Recording is only supported for web sessions. '
+                          'Ensure a web develop session is running.',
+                    ),
+                  ],
+                  isError: true,
+                );
+              }
+
+              if (cdp.isRecording) {
+                return const CallToolResult(
+                  content: [
+                    TextContent(
+                      text: 'Recording is already in progress.',
+                    ),
+                  ],
+                  isError: true,
+                );
+              }
+
+              try {
+                await cdp.startRecording();
+                return const CallToolResult(
+                  content: [
+                    TextContent(
+                      text: 'Recording started. '
+                          'Use stop-recording to get the animated GIF. '
+                          'Recording will auto-stop after 30 seconds.',
+                    ),
+                  ],
+                );
+              } catch (e) {
+                return CallToolResult(
+                  content: [
+                    TextContent(text: 'Failed to start recording: $e'),
+                  ],
+                  isError: true,
+                );
+              }
+            },
+          )
+          ..registerTool(
+            'stop-recording',
+            description:
+                'Stop recording and return an animated GIF of the captured '
+                'frames. Only works if start-recording was called first.',
+            annotations: const ToolAnnotations(title: 'Stop Recording'),
+            callback: (args, extra) async {
+              final cdp = patrolSession.cdpService;
+              if (cdp == null) {
+                return const CallToolResult(
+                  content: [
+                    TextContent(text: 'No web session available.'),
+                  ],
+                  isError: true,
+                );
+              }
+
+              if (!cdp.isRecording) {
+                return const CallToolResult(
+                  content: [
+                    TextContent(
+                      text: 'No recording in progress. '
+                          'Call start-recording first.',
+                    ),
+                  ],
+                  isError: true,
+                );
+              }
+
+              try {
+                final frames = await cdp.stopRecording();
+                if (frames.isEmpty) {
+                  return const CallToolResult(
+                    content: [
+                      TextContent(
+                        text: 'Recording stopped but no frames '
+                            'were captured.',
+                      ),
+                    ],
+                  );
+                }
+
+                final gifBytes = VideoEncoder.encodeGif(frames);
+                final base64Data = base64Encode(gifBytes);
+
+                return CallToolResult(
+                  content: [
+                    TextContent(
+                      text: 'Recording stopped. '
+                          'Captured ${frames.length} frames.',
+                    ),
+                    ImageContent(
+                      data: base64Data,
+                      mimeType: 'image/gif',
+                    ),
+                  ],
+                );
+              } catch (e) {
+                return CallToolResult(
+                  content: [
+                    TextContent(text: 'Failed to stop recording: $e'),
+                  ],
+                  isError: true,
+                );
+              }
             },
           );
 

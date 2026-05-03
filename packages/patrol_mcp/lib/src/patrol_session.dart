@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:patrol_cli/patrol_cli.dart';
 
+import 'cdp_service.dart';
 import 'log_streaming.dart';
 
 /// An [io.Stdout] wrapper that forwards writes to [_inner] (e.g. stderr) and
@@ -206,9 +207,23 @@ final class PatrolSession {
 
   final _logStreaming = LogStreaming.instance;
 
+  CdpService? _cdpService;
+
   /// The device discovered by the last [startAndWait] call.
   Device? get device => _developService?.device;
   int? get testServerPort => _testServerPort;
+
+  /// The Chrome DevTools debugger port, if running a web session.
+  int? get webDebuggerPort => _developService?.webDebuggerPort;
+
+  /// CDP service for web screenshot/video, lazily created.
+  CdpService? get cdpService {
+    final port = webDebuggerPort;
+    if (port == null) {
+      return null;
+    }
+    return _cdpService ??= CdpService(debuggerPort: port);
+  }
 
   /// Returns null if started successfully, or a warning message if blocked
   Future<String?> _start(String testFile) async {
@@ -352,6 +367,13 @@ final class PatrolSession {
     _isRunning = false;
     _currentTestFile = null;
     _testServerPort = null;
+
+    try {
+      await _cdpService?.disconnect();
+    } catch (e) {
+      logger.fine('Error disconnecting CDP: $e');
+    }
+    _cdpService = null;
 
     await _logStreaming.stopLogging();
 

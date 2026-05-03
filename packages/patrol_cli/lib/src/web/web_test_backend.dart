@@ -30,6 +30,11 @@ class WebTestBackend {
   final Logger _logger;
   final DisposeScope _disposeScope;
 
+  int? _webDebuggerPort;
+
+  /// The Chrome DevTools debugger port discovered during [develop].
+  int? get webDebuggerPort => _webDebuggerPort;
+
   Future<void> build(WebAppOptions options) async {
     _logger.detail('Building web app for testing...');
 
@@ -129,6 +134,7 @@ class WebTestBackend {
         flutterProcess,
         serverTimeout: options.serverTimeout,
       );
+      _webDebuggerPort = int.parse(port);
 
       _attachForHotRestart(flutterProcess, switch (previousStdinModes) {
         final stdinModes? => () => flutterTool.revertInteractiveMode(
@@ -140,6 +146,8 @@ class WebTestBackend {
       // Run Playwright tests
       await _runPlaywrightDevelop(port, options);
     } finally {
+      _webDebuggerPort = null;
+
       if (previousStdinModes != null) {
         flutterTool.revertInteractiveMode(previousStdinModes);
       }
