@@ -469,10 +469,8 @@ class DevelopService {
     }
 
     subscriptions.add(ProcessSignal.sigint.watch().listen(cleanup));
-    try {
+    if (!Platform.isWindows) {
       subscriptions.add(ProcessSignal.sigterm.watch().listen(cleanup));
-    } catch (_) {
-      // Some platforms may not support sigterm.
     }
 
     return subscriptions;
