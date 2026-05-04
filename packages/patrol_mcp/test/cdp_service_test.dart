@@ -155,9 +155,7 @@ void main() {
 
       expect(service.isRecording, false);
 
-      final startFuture = service.startRecording(
-        maxDuration: const Duration(seconds: 60),
-      );
+      final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
       ws.receiveMessage(<String, dynamic>{'id': 2, 'result': <String, dynamic>{}});
       await startFuture;
@@ -192,9 +190,7 @@ void main() {
       ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
       await connectFuture;
 
-      final startFuture = service.startRecording(
-        maxDuration: const Duration(seconds: 60),
-      );
+      final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
       ws.receiveMessage(<String, dynamic>{'id': 2, 'result': <String, dynamic>{}});
       await startFuture;
@@ -282,9 +278,7 @@ void main() {
       ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
       await connectFuture;
 
-      final startFuture = service.startRecording(
-        maxDuration: const Duration(seconds: 60),
-      );
+      final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
 
       // Find the startScreencast command

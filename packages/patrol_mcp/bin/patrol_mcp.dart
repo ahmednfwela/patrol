@@ -110,8 +110,7 @@ Future<int> main(List<String> args) async {
                   '- run waits for test completion.\n'
                   '- screenshot auto-detects the platform. '
                   'For web, it uses Chrome DevTools Protocol.\n'
-                  '- start-recording/stop-recording only work for web sessions. '
-                  'Recording auto-stops after 30 seconds.\n'
+                  '- start-recording/stop-recording only work for web sessions.\n'
                   '- status is optional and mainly useful for debugging.\n'
                   '- native-tree is for native interactions and cross-app inspection.',
             ),
@@ -211,7 +210,7 @@ Future<int> main(List<String> args) async {
             description:
                 'Start recording the web browser screen via CDP screencast. '
                 'Only works for web sessions. '
-                'Recording auto-stops after 30 seconds or 150 frames.',
+                'Call stop-recording to get the animated GIF.',
             annotations: const ToolAnnotations(title: 'Start Recording'),
             callback: (args, extra) async {
               final cdp = patrolSession.cdpService;
@@ -244,8 +243,7 @@ Future<int> main(List<String> args) async {
                   content: [
                     TextContent(
                       text: 'Recording started. '
-                          'Use stop-recording to get the animated GIF. '
-                          'Recording will auto-stop after 30 seconds.',
+                          'Use stop-recording to get the animated GIF.',
                     ),
                   ],
                 );

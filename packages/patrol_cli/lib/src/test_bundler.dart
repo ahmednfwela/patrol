@@ -197,7 +197,7 @@ Future<void> main() async {
     config: PlatformAutomatorConfig.defaultConfig(),
   );
   await platformAutomator.initialize();
-  
+
   PatrolBinding.ensureInitialized(platformAutomator)
     ..workaroundDebugDefaultTargetPlatformOverride =
         debugDefaultTargetPlatformOverride;
@@ -213,8 +213,8 @@ ${generateGroupsCode(testDirectory, [testFilePath]).split('\n').map((e) => '  $e
       ..writeAsStringSync(contents);
 
     /// Related with [https://github.com/flutter/devtools/issues/9667].
-    /// Patrol devtools extension is not found when the test is moved to `patrol_test/`.
-    /// This is a workaround to create a proxy entrypoint to make the devtools extension work.
+    /// Patrol devtools extension is not found when the test is moved to
+    /// `patrol_test/`. This creates a proxy entrypoint so DevTools works.
     _createEntrypointProxyIfNeeded(testDirectory);
 
     _logger.detail('Generated entrypoint ${bundle.path} for development');

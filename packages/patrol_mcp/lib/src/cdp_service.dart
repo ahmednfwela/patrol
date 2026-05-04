@@ -37,10 +37,7 @@ class CdpService {
 
   var _isRecording = false;
   final _frames = <ScreencastFrame>[];
-  Timer? _maxDurationTimer;
   Completer<void>? _recordingCompleter;
-  static const _maxRecordingDuration = Duration(seconds: 30);
-  static const _maxFrames = 150;
   static const _commandTimeout = Duration(seconds: 10);
 
   bool get isRecording => _isRecording;
@@ -94,8 +91,6 @@ class CdpService {
   }
 
   Future<void> disconnect() async {
-    _maxDurationTimer?.cancel();
-    _maxDurationTimer = null;
     _isRecording = false;
     _frames.clear();
 
@@ -124,7 +119,7 @@ class CdpService {
     return base64Decode(result['data'] as String);
   }
 
-  Future<void> startRecording({Duration? maxDuration}) async {
+  Future<void> startRecording() async {
     if (_isRecording) {
       throw StateError('Recording already in progress');
     }
@@ -142,14 +137,6 @@ class CdpService {
 
     _isRecording = true;
     _recordingCompleter = Completer<void>();
-
-    final duration = maxDuration ?? _maxRecordingDuration;
-    _maxDurationTimer = Timer(duration, () {
-      if (_isRecording) {
-        _logger.info('Max recording duration reached, auto-stopping');
-        _stopRecordingInternal();
-      }
-    });
   }
 
   Future<List<ScreencastFrame>> stopRecording() async {
@@ -169,8 +156,6 @@ class CdpService {
   }
 
   void _stopRecordingInternal() {
-    _maxDurationTimer?.cancel();
-    _maxDurationTimer = null;
     _isRecording = false;
     if (_recordingCompleter case final c? when !c.isCompleted) {
       c.complete();
@@ -260,18 +245,6 @@ class CdpService {
     );
 
     if (!_isRecording) {
-      return;
-    }
-
-    if (_frames.length >= _maxFrames) {
-      _logger.info('Max frames reached, auto-stopping recording');
-      _stopRecordingInternal();
-      unawaited(
-        _sendCommand('Page.stopScreencast').onError((e, _) {
-          _logger.fine('Auto-stop screencast failed (non-fatal): $e');
-          return <String, dynamic>{};
-        }),
-      );
       return;
     }
 
