@@ -261,7 +261,18 @@ Future<int> main(List<String> args) async {
             'stop-recording',
             description:
                 'Stop recording and return an animated GIF of the captured '
-                'frames. Only works if start-recording was called first.',
+                'frames. Only works if start-recording was called first. '
+                'Optionally saves the GIF to disk via savePath.',
+            inputSchema: const ToolInputSchema(
+              properties: {
+                'savePath': JsonString(
+                  description:
+                      'Optional file path to save the GIF to disk '
+                      '(e.g. "recordings/flow.gif"). '
+                      'Relative paths are resolved from PROJECT_ROOT.',
+                ),
+              },
+            ),
             annotations: const ToolAnnotations(title: 'Stop Recording'),
             callback: (args, extra) async {
               final cdp = patrolSession.cdpService;
@@ -302,11 +313,20 @@ Future<int> main(List<String> args) async {
                 final gifBytes = VideoEncoder.encodeGif(frames);
                 final base64Data = base64Encode(gifBytes);
 
+                final savePath = args['savePath'] as String?;
+                var savedMessage = '';
+                if (savePath != null && savePath.isNotEmpty) {
+                  final file = File(savePath);
+                  await file.parent.create(recursive: true);
+                  await file.writeAsBytes(gifBytes);
+                  savedMessage = ' Saved to ${file.path}';
+                }
+
                 return CallToolResult(
                   content: [
                     TextContent(
                       text: 'Recording stopped. '
-                          'Captured ${frames.length} frames.',
+                          'Captured ${frames.length} frames.$savedMessage',
                     ),
                     ImageContent(
                       data: base64Data,
