@@ -298,9 +298,6 @@ class CdpService {
 
   void _handleConsoleCall(Map<String, dynamic> params) {
     final type = params['type'] as String? ?? '';
-    if (type != 'error' && type != 'warning') {
-      return;
-    }
     final args = params['args'] as List<dynamic>? ?? [];
     final parts = <String>[];
     for (final arg in args) {
@@ -310,8 +307,17 @@ class CdpService {
         parts.add('$value');
       }
     }
-    if (parts.isNotEmpty) {
-      _pushConsoleLog('[${type.toUpperCase()}] ${parts.join(' ')}');
+    if (parts.isEmpty) {
+      return;
+    }
+    final text = parts.join(' ');
+    if (type == 'error' || type == 'warning') {
+      _pushConsoleLog('[${type.toUpperCase()}] $text');
+    } else if (text.contains('EXCEPTION') ||
+        text.contains('Test failed') ||
+        text.contains('TestFailure') ||
+        text.contains('status":"failure"')) {
+      _pushConsoleLog('[TEST_FAILURE] $text');
     }
   }
 
