@@ -62,46 +62,52 @@ CdpService _createService({_MockWebSocket? ws}) {
 Map<String, dynamic> _parseMessage(String raw) =>
     jsonDecode(raw) as Map<String, dynamic>;
 
+/// Connect sends Page.enable, Runtime.enable, Log.enable (3 commands).
+/// This helper responds to all 3 and awaits connect().
+Future<void> _completeConnect(_MockWebSocket ws, CdpService service) async {
+  final connectFuture = service.connect();
+  for (var id = 1; id <= 3; id++) {
+    await Future<void>.delayed(Duration.zero);
+    ws.receiveMessage(<String, dynamic>{
+      'id': id,
+      'result': <String, dynamic>{},
+    });
+  }
+  await connectFuture;
+}
+
+/// The next command ID after connect (3 enable commands = IDs 1,2,3).
+const _postConnectId = 4;
+
 void main() {
   group('CdpService', () {
-    test('connect sends Page.enable', () async {
+    test('connect sends Page.enable, Runtime.enable, Log.enable', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
 
-      final connectFuture = service.connect();
+      await _completeConnect(ws, service);
 
-      await Future<void>.delayed(Duration.zero);
-      expect(ws.sent, hasLength(1));
-
-      final msg = _parseMessage(ws.sent.first);
-      expect(msg['method'], 'Page.enable');
-      expect(msg['id'], 1);
-
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      final methods = ws.sent.map(_parseMessage).map((m) => m['method']);
+      expect(methods, ['Page.enable', 'Runtime.enable', 'Log.enable']);
     });
 
     test('captureScreenshot sends correct command', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       final screenshotFuture = service.captureScreenshot();
       await Future<void>.delayed(Duration.zero);
 
-      expect(ws.sent, hasLength(2));
-      final msg = _parseMessage(ws.sent[1]);
-      expect(msg['method'], 'Page.captureScreenshot');
+      final msg = ws.sent
+          .map(_parseMessage)
+          .firstWhere((m) => m['method'] == 'Page.captureScreenshot');
       expect((msg['params'] as Map)['format'], 'png');
       expect((msg['params'] as Map)['optimizeForSpeed'], true);
 
       final fakeData = base64Encode([0x89, 0x50, 0x4E, 0x47]);
       ws.receiveMessage(<String, dynamic>{
-        'id': 2,
+        'id': _postConnectId,
         'result': <String, dynamic>{'data': fakeData},
       });
 
@@ -112,18 +118,17 @@ void main() {
     test('CDP error response propagates as exception', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       final screenshotFuture = service.captureScreenshot();
       await Future<void>.delayed(Duration.zero);
 
       ws.receiveMessage(<String, dynamic>{
-        'id': 2,
-        'error': <String, dynamic>{'code': -32000, 'message': 'Page not found'},
+        'id': _postConnectId,
+        'error': <String, dynamic>{
+          'code': -32000,
+          'message': 'Page not found',
+        },
       });
 
       await expectLater(screenshotFuture, throwsException);
@@ -132,12 +137,9 @@ void main() {
     test('command timeout fires after duration', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
+      await _completeConnect(ws, service);
 
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
-
+      // Don't respond — should timeout
       await expectLater(
         service.captureScreenshot(),
         throwsA(isA<TimeoutException>()),
@@ -147,52 +149,45 @@ void main() {
     test('recording state machine', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       expect(service.isRecording, false);
 
       final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 2, 'result': <String, dynamic>{}});
+      ws.receiveMessage(<String, dynamic>{
+        'id': _postConnectId,
+        'result': <String, dynamic>{},
+      });
       await startFuture;
 
       expect(service.isRecording, true);
-
-      expect(
-        service.startRecording,
-        throwsA(isA<StateError>()),
-      );
+      expect(service.startRecording, throwsA(isA<StateError>()));
 
       final stopFuture = service.stopRecording();
       await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 3, 'result': <String, dynamic>{}});
+      ws.receiveMessage(<String, dynamic>{
+        'id': _postConnectId + 1,
+        'result': <String, dynamic>{},
+      });
       final frames = await stopFuture;
 
       expect(service.isRecording, false);
       expect(frames, isEmpty);
-
-      expect(
-        service.stopRecording,
-        throwsA(isA<StateError>()),
-      );
+      expect(service.stopRecording, throwsA(isA<StateError>()));
     });
 
     test('screencast frames are collected and acked', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 2, 'result': <String, dynamic>{}});
+      ws.receiveMessage(<String, dynamic>{
+        'id': _postConnectId,
+        'result': <String, dynamic>{},
+      });
       await startFuture;
 
       final frameData = base64Encode([0xFF, 0xD8, 0xFF, 0xE0]);
@@ -211,14 +206,14 @@ void main() {
           .where((m) => m['method'] == 'Page.screencastFrameAck')
           .toList();
       expect(ackMessages, hasLength(1));
-      expect(
-        (ackMessages.first['params'] as Map)['sessionId'],
-        1,
-      );
+      expect((ackMessages.first['params'] as Map)['sessionId'], 1);
 
       final stopFuture = service.stopRecording();
       await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 4, 'result': <String, dynamic>{}});
+      ws.receiveMessage(<String, dynamic>{
+        'id': _postConnectId + 2,
+        'result': <String, dynamic>{},
+      });
       final frames = await stopFuture;
 
       expect(frames, hasLength(1));
@@ -229,11 +224,7 @@ void main() {
     test('disconnect cleans up state', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       await service.disconnect();
       expect(ws.closed, true);
@@ -243,11 +234,7 @@ void main() {
     test('auto-incrementing message IDs', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       final f1 = service.captureScreenshot();
       await Future<void>.delayed(Duration.zero);
@@ -257,13 +244,19 @@ void main() {
       final ids = ws.sent
           .map((s) => _parseMessage(s)['id'] as int)
           .toList();
-      // Page.enable=1, screenshot=2, screenshot=3
-      expect(ids, [1, 2, 3]);
+      // Page.enable=1, Runtime.enable=2, Log.enable=3, screenshot=4,5
+      expect(ids, [1, 2, 3, _postConnectId, _postConnectId + 1]);
 
       final fakeData = base64Encode([0x89]);
       ws
-        ..receiveMessage(<String, dynamic>{'id': 2, 'result': <String, dynamic>{'data': fakeData}})
-        ..receiveMessage(<String, dynamic>{'id': 3, 'result': <String, dynamic>{'data': fakeData}});
+        ..receiveMessage(<String, dynamic>{
+          'id': _postConnectId,
+          'result': <String, dynamic>{'data': fakeData},
+        })
+        ..receiveMessage(<String, dynamic>{
+          'id': _postConnectId + 1,
+          'result': <String, dynamic>{'data': fakeData},
+        });
 
       await f1;
       await f2;
@@ -272,16 +265,11 @@ void main() {
     test('startScreencast sends correct parameters', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
 
-      // Find the startScreencast command
       final startMsg = ws.sent
           .map(_parseMessage)
           .firstWhere((m) => m['method'] == 'Page.startScreencast');
@@ -293,31 +281,31 @@ void main() {
       expect(params['maxHeight'], 600);
       expect(params['everyNthFrame'], 6);
 
-      ws.receiveMessage(<String, dynamic>{'id': 2, 'result': <String, dynamic>{}});
+      ws.receiveMessage(<String, dynamic>{
+        'id': _postConnectId,
+        'result': <String, dynamic>{},
+      });
       await startFuture;
 
-      // Cleanup
       final stopFuture = service.stopRecording();
       await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 3, 'result': <String, dynamic>{}});
+      ws.receiveMessage(<String, dynamic>{
+        'id': _postConnectId + 1,
+        'result': <String, dynamic>{},
+      });
       await stopFuture;
     });
 
     test('failed startScreencast does not set isRecording', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
-
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{'id': 1, 'result': <String, dynamic>{}});
-      await connectFuture;
+      await _completeConnect(ws, service);
 
       final startFuture = service.startRecording();
       await Future<void>.delayed(Duration.zero);
 
-      // Respond with CDP error
       ws.receiveMessage(<String, dynamic>{
-        'id': 2,
+        'id': _postConnectId,
         'error': <String, dynamic>{
           'code': -32000,
           'message': 'Screencast not supported',
@@ -331,16 +319,8 @@ void main() {
     test('frames received while not recording are ignored', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
+      await _completeConnect(ws, service);
 
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{
-        'id': 1,
-        'result': <String, dynamic>{},
-      });
-      await connectFuture;
-
-      // Send frame while NOT recording
       final frameData = base64Encode([0xFF, 0xD8, 0xFF, 0xE0]);
       ws.receiveMessage(<String, dynamic>{
         'method': 'Page.screencastFrame',
@@ -352,32 +332,19 @@ void main() {
       });
       await Future<void>.delayed(Duration.zero);
 
-      // ACK should still be sent (CDP requires it regardless)
       final ackMessages = ws.sent
           .map(_parseMessage)
           .where((m) => m['method'] == 'Page.screencastFrameAck')
           .toList();
       expect(ackMessages, hasLength(1));
-
-      // But no frames collected
       expect(service.isRecording, false);
     });
 
-    test('disconnect during pending command completes with error',
-        () async {
+    test('disconnect during pending command completes with error', () async {
       final ws = _MockWebSocket();
       final service = _createService(ws: ws);
+      await _completeConnect(ws, service);
 
-      final connectFuture = service.connect();
-      await Future<void>.delayed(Duration.zero);
-      ws.receiveMessage(<String, dynamic>{
-        'id': 1,
-        'result': <String, dynamic>{},
-      });
-      await connectFuture;
-
-      // Start a screenshot but don't respond — capture the future
-      // before disconnecting so the error doesn't go unhandled.
       var caughtError = false;
       final screenshotFuture =
           service.captureScreenshot().then<void>((_) {}).catchError(
@@ -387,12 +354,76 @@ void main() {
       );
 
       await Future<void>.delayed(Duration.zero);
-
-      // Disconnect while command is pending
       await service.disconnect();
-
       await screenshotFuture;
       expect(caughtError, true);
+    });
+
+    test('console errors are captured via Runtime.exceptionThrown', () async {
+      final ws = _MockWebSocket();
+      final service = _createService(ws: ws);
+      await _completeConnect(ws, service);
+
+      ws.receiveMessage(<String, dynamic>{
+        'method': 'Runtime.exceptionThrown',
+        'params': <String, dynamic>{
+          'timestamp': 1234.0,
+          'exceptionDetails': <String, dynamic>{
+            'text': 'Uncaught',
+            'exception': <String, dynamic>{
+              'description': 'Error: Something broke',
+            },
+          },
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.consoleErrors, hasLength(1));
+      expect(service.consoleErrors.first, contains('Something broke'));
+    });
+
+    test('console warnings are captured via Runtime.consoleAPICalled',
+        () async {
+      final ws = _MockWebSocket();
+      final service = _createService(ws: ws);
+      await _completeConnect(ws, service);
+
+      ws.receiveMessage(<String, dynamic>{
+        'method': 'Runtime.consoleAPICalled',
+        'params': <String, dynamic>{
+          'type': 'error',
+          'args': <dynamic>[
+            <String, dynamic>{'type': 'string', 'value': 'Test failed'},
+          ],
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.consoleLogs, hasLength(1));
+      expect(service.consoleLogs.first, contains('Test failed'));
+    });
+
+    test('clearConsole resets captured errors and logs', () async {
+      final ws = _MockWebSocket();
+      final service = _createService(ws: ws);
+      await _completeConnect(ws, service);
+
+      ws.receiveMessage(<String, dynamic>{
+        'method': 'Runtime.exceptionThrown',
+        'params': <String, dynamic>{
+          'timestamp': 1.0,
+          'exceptionDetails': <String, dynamic>{
+            'text': 'err',
+            'exception': <String, dynamic>{'value': 'x'},
+          },
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+      expect(service.consoleErrors, isNotEmpty);
+
+      service.clearConsole();
+      expect(service.consoleErrors, isEmpty);
+      expect(service.consoleLogs, isEmpty);
     });
   });
 }

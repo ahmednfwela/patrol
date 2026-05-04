@@ -40,7 +40,22 @@ class CdpService {
   Completer<void>? _recordingCompleter;
   static const _commandTimeout = Duration(seconds: 10);
 
+  final _consoleErrors = <String>[];
+  final _consoleLogs = <String>[];
+  static const _maxConsoleEntries = 500;
+
   bool get isRecording => _isRecording;
+
+  /// Browser console errors captured via CDP Runtime.exceptionThrown.
+  List<String> get consoleErrors => List.unmodifiable(_consoleErrors);
+
+  /// Browser console logs (warn+error level) via CDP Runtime.consoleAPICalled.
+  List<String> get consoleLogs => List.unmodifiable(_consoleLogs);
+
+  void clearConsole() {
+    _consoleErrors.clear();
+    _consoleLogs.clear();
+  }
 
   static Future<String> _defaultTargetDiscovery(int port) async {
     final client = HttpClient();
@@ -88,6 +103,8 @@ class CdpService {
     );
 
     await _sendCommand('Page.enable');
+    await _sendCommand('Runtime.enable');
+    await _sendCommand('Log.enable');
   }
 
   Future<void> disconnect() async {
@@ -224,10 +241,16 @@ class CdpService {
     }
 
     final method = msg['method'] as String?;
-    if (method == 'Page.screencastFrame') {
-      _handleScreencastFrame(
-        msg['params'] as Map<String, dynamic>,
-      );
+    final params = msg['params'] as Map<String, dynamic>?;
+    switch (method) {
+      case 'Page.screencastFrame':
+        _handleScreencastFrame(params!);
+      case 'Runtime.exceptionThrown':
+        _handleException(params!);
+      case 'Runtime.consoleAPICalled':
+        _handleConsoleCall(params!);
+      case 'Log.entryAdded':
+        _handleLogEntry(params!);
     }
   }
 
@@ -256,5 +279,73 @@ class CdpService {
       data: Uint8List.fromList(data),
       timestamp: timestamp,
     ));
+  }
+
+  void _handleException(Map<String, dynamic> params) {
+    final details = params['exceptionDetails'] as Map<String, dynamic>?;
+    if (details == null) {
+      return;
+    }
+    final text = details['text'] as String? ?? '';
+    final exception = details['exception'] as Map<String, dynamic>?;
+    final description =
+        exception?['description'] as String? ??
+        exception?['value'] as String? ??
+        '';
+    final message = description.isNotEmpty ? '$text: $description' : text;
+    _pushConsoleError('[EXCEPTION] $message');
+  }
+
+  void _handleConsoleCall(Map<String, dynamic> params) {
+    final type = params['type'] as String? ?? '';
+    if (type != 'error' && type != 'warning') {
+      return;
+    }
+    final args = params['args'] as List<dynamic>? ?? [];
+    final parts = <String>[];
+    for (final arg in args) {
+      final a = arg as Map<String, dynamic>;
+      final value = a['value'] ?? a['description'] ?? a['unserializableValue'];
+      if (value != null) {
+        parts.add('$value');
+      }
+    }
+    if (parts.isNotEmpty) {
+      _pushConsoleLog('[${type.toUpperCase()}] ${parts.join(' ')}');
+    }
+  }
+
+  void _handleLogEntry(Map<String, dynamic> params) {
+    final entry = params['entry'] as Map<String, dynamic>? ?? params;
+    final level = entry['level'] as String? ?? '';
+    if (level != 'error' && level != 'warning') {
+      return;
+    }
+    final text = entry['text'] as String? ?? '';
+    if (text.isNotEmpty) {
+      _pushConsoleLog('[LOG:${level.toUpperCase()}] $text');
+    }
+  }
+
+  void _pushConsoleError(String message) {
+    _consoleErrors.add(message);
+    if (_consoleErrors.length > _maxConsoleEntries) {
+      _consoleErrors.removeRange(
+        0,
+        _consoleErrors.length - _maxConsoleEntries,
+      );
+    }
+    _logger.warning('Browser: $message');
+  }
+
+  void _pushConsoleLog(String message) {
+    _consoleLogs.add(message);
+    if (_consoleLogs.length > _maxConsoleEntries) {
+      _consoleLogs.removeRange(
+        0,
+        _consoleLogs.length - _maxConsoleEntries,
+      );
+    }
+    _logger.info('Browser: $message');
   }
 }
