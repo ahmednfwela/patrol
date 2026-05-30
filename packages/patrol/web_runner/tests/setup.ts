@@ -1,4 +1,4 @@
-import { chromium, type FullConfig } from "@playwright/test"
+import { chromium, type FullConfig, type Page } from "@playwright/test"
 import { initialise } from "./initialise"
 import { exposePatrolPlatformHandler } from "./patrolPlatformHandler"
 import { DartTestEntry, PatrolTestEntry } from "./types"
@@ -54,7 +54,7 @@ async function setup(config: FullConfig) {
   // during load.
   await page.goto(baseURL, { waitUntil: "domcontentloaded" })
 
-  // Inject a small script to guarantee the variable is set *right now* in case domcontentloaded 
+  // Inject a small script to guarantee the variable is set *right now* in case domcontentloaded
   // already cleared the context or something.
   await page.evaluate(() => {
     window.__patrol__isInitialised = true
@@ -63,23 +63,60 @@ async function setup(config: FullConfig) {
   await initialise(page)
 
   try {
-    const testEntriesResponse = (await Promise.race([
+    const testEntriesResponse = await discoverTestTree(page, setupPageErrorPromise)
+
+    const patrolTests = mapEntry(testEntriesResponse.group)
+    process.env.PATROL_TESTS = JSON.stringify(patrolTests)
+  } finally {
+    await browser.close()
+  }
+}
+
+/**
+ * Reads the Dart test tree exposed on the page, waiting until at least one test
+ * has been registered.
+ *
+ * `window.__patrol__getTests()` becomes callable as soon as the patrol app
+ * service boots, but on a slow/cold WASM boot it can briefly return a
+ * truthy-but-empty group (`{ entries: [] }`) while the `patrolTest()`/`group()`
+ * declarations are still executing. The previous implementation resolved on the
+ * first truthy value, so it occasionally captured that empty snapshot, set
+ * `PATROL_TESTS=[]`, and produced 0 Playwright tests — a flaky "no tests found"
+ * (exit 1) that poisoned the entire shard. We therefore poll until the tree is
+ * non-empty (bounded by the same 120s timeout). If the timeout elapses we fall
+ * back to a single direct read so a *genuinely* empty suite still resolves to
+ * `[]` instead of surfacing the timeout.
+ */
+async function discoverTestTree(page: Page, setupPageErrorPromise: Promise<never>): Promise<{ group: DartTestEntry }> {
+  try {
+    return (await Promise.race([
       page
         .waitForFunction(
           () => {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            return window.__patrol__getTests?.()!
+            const response = window.__patrol__getTests?.()
+            if (!response) return false
+
+            // Count registered test leaves; only resolve once at least one exists.
+            const countTests = (entry: DartTestEntry): number =>
+              (entry.type === "test" ? 1 : 0) + entry.entries.reduce((sum, child) => sum + countTests(child), 0)
+
+            return countTests(response.group) > 0 ? response : false
           },
           { timeout: 120000 },
         )
         .then(v => v.jsonValue()),
       setupPageErrorPromise,
     ])) as { group: DartTestEntry }
-
-    const patrolTests = mapEntry(testEntriesResponse.group)
-    process.env.PATROL_TESTS = JSON.stringify(patrolTests)
-  } finally {
-    await browser.close()
+  } catch (error) {
+    if (error instanceof Error && /Timeout.*exceeded/i.test(error.message)) {
+      const fallback = (await page.evaluate(() => window.__patrol__getTests?.() ?? null)) as {
+        group: DartTestEntry
+      } | null
+      if (fallback) {
+        return fallback
+      }
+    }
+    throw error
   }
 }
 
