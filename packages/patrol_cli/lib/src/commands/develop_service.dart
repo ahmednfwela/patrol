@@ -155,6 +155,11 @@ class DevelopService {
       throwToolExit('macOS is not supported with develop');
     }
 
+    if (device.targetPlatform == TargetPlatform.linux ||
+        device.targetPlatform == TargetPlatform.windows) {
+      throwToolExit('Desktop (Linux/Windows) is not supported with develop');
+    }
+
     // Web develop works via flutter run -d chrome with CDP-based
     // screenshot/video. Hot restart of test code is limited (changes
     // outside /lib are not hot-restarted, see flutter#175318).
@@ -291,6 +296,8 @@ class DevelopService {
       TargetPlatform.iOS => () => _iosTestBackend.build(iosOpts),
       TargetPlatform.macOS => () => _macosTestBackend.build(macosOpts),
       TargetPlatform.web => () => _webTestBackend.buildForDevelop(webOpts),
+      TargetPlatform.linux ||
+      TargetPlatform.windows => throw StateError('unreachable'),
     };
 
     try {
@@ -333,6 +340,8 @@ class DevelopService {
         }
       case TargetPlatform.macOS:
       case TargetPlatform.web:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
     }
 
     try {
@@ -410,6 +419,9 @@ class DevelopService {
           clearTestSteps: clearTestSteps,
           stdin: _stdin,
         );
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        throw StateError('unreachable');
     }
 
     try {
