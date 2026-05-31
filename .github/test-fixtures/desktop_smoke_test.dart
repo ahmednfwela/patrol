@@ -41,6 +41,26 @@ void main() {
     expect(DesktopAutomator.isSupported, isTrue);
     expect($.platform.desktop, isA<DesktopAutomator>());
   });
+
+  // Test 4: verify $.platform.tap routes to desktop automator
+  patrolTest('platform tap routes to desktop automator', ($) async {
+    await $.pumpWidgetAndSettle(
+      const MaterialApp(home: Scaffold(body: Text('Native Routing'))),
+    );
+
+    // $.platform.tap() should route through DesktopAutomator on desktop.
+    // It throws PlatformException('ELEMENT_NOT_FOUND') because there's
+    // no native element called 'NonExistentButton' — but critically it
+    // must NOT throw UnsupportedError (that would mean routing is broken).
+    try {
+      await $.platform.tap(Selector(text: 'NonExistentButton'));
+      fail('Should have thrown');
+    } on Exception catch (e) {
+      expect(e.toString(), isNot(contains('Unsupported platform')));
+      expect(e.toString(), isNot(contains('No desktop handler')));
+      expect(e.toString(), contains('ELEMENT_NOT_FOUND'));
+    }
+  });
 }
 
 class _CounterPage extends StatefulWidget {

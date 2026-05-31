@@ -219,6 +219,10 @@ class PlatformAutomator {
       ios: () => ios.tap(selector.ios, appId: appId, timeout: timeout),
       web: () => web.tap(selector.web),
       macos: _throwOnMacOS,
+      desktop: () => desktop.tap(
+        name: selector.android.text,
+        className: selector.android.className,
+      ),
     );
   }
 
