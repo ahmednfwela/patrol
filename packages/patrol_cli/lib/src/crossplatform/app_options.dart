@@ -389,6 +389,45 @@ class MacOSAppOptions {
   }
 }
 
+class DesktopAppOptions {
+  const DesktopAppOptions({
+    required this.flutter,
+    required this.platform,
+    required this.appServerPort,
+  });
+
+  final FlutterAppOptions flutter;
+  final TargetPlatform platform;
+  final int appServerPort;
+
+  String get platformName =>
+      platform == TargetPlatform.linux ? 'linux' : 'windows';
+
+  String get description {
+    return 'app with entrypoint ${basename(flutter.target)} for $platformName';
+  }
+
+  List<String> toFlutterBuildInvocation() {
+    final cmd = [
+      flutter.command.executable,
+      ...flutter.command.arguments,
+      'build',
+      platformName,
+      '--target=${flutter.target}',
+      '--${flutter.buildMode.name}',
+      if (flutter.noTreeShakeIcons) '--no-tree-shake-icons',
+      ...flutter.dartDefines.entries.map(
+        (e) => '--dart-define=${e.key}=${e.value}',
+      ),
+      ...flutter.dartDefineFromFilePaths.map(
+        (e) => '--dart-define-from-file=$e',
+      ),
+    ];
+
+    return cmd;
+  }
+}
+
 class WebAppOptions {
   const WebAppOptions({
     required this.flutter,

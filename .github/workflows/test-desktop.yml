@@ -1,0 +1,215 @@
+name: Desktop Integration Tests
+
+on:
+  push:
+    branches: [master, fixed]
+    paths:
+      - 'packages/patrol/**'
+      - 'packages/patrol_cli/**'
+      - '.github/workflows/test-desktop.yml'
+  pull_request:
+    branches: [master, fixed]
+    paths:
+      - 'packages/patrol/**'
+      - 'packages/patrol_cli/**'
+      - '.github/workflows/test-desktop.yml'
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            xvfb
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Activate patrol_cli from source
+        run: dart pub global activate --source path packages/patrol_cli
+
+      - name: Create minimal desktop test app
+        run: |
+          mkdir -p /tmp/desktop_test_app
+          cd /tmp/desktop_test_app
+          flutter create --platforms=linux . --project-name desktop_test_app
+          # Add patrol dependency pointing to the checked-out source
+          cat > pubspec_overrides.yaml << 'YAML'
+          dependency_overrides:
+            patrol:
+              path: ${{ github.workspace }}/packages/patrol
+          YAML
+          # Add patrol to dev_dependencies
+          flutter pub add --dev patrol --path=${{ github.workspace }}/packages/patrol
+          flutter pub get
+
+      - name: Create patrol test
+        run: |
+          mkdir -p /tmp/desktop_test_app/patrol_test
+          cat > /tmp/desktop_test_app/patrol_test/desktop_smoke_test.dart << 'DART'
+          import 'package:flutter/material.dart';
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:patrol/patrol.dart';
+
+          void main() {
+            patrolTest('basic widget test on desktop', ($) async {
+              await $.pumpWidgetAndSettle(
+                MaterialApp(
+                  home: Scaffold(
+                    appBar: AppBar(title: const Text('Desktop Test')),
+                    body: const Center(child: Text('Hello Desktop')),
+                  ),
+                ),
+              );
+
+              expect($('Desktop Test'), findsOneWidget);
+              expect($('Hello Desktop'), findsOneWidget);
+            });
+
+            patrolTest('tap and state change on desktop', ($) async {
+              await $.pumpWidgetAndSettle(
+                MaterialApp(home: const _CounterPage()),
+              );
+
+              expect($('Count: 0'), findsOneWidget);
+              await $(FloatingActionButton).tap();
+              expect($('Count: 1'), findsOneWidget);
+              await $(FloatingActionButton).tap();
+              expect($('Count: 2'), findsOneWidget);
+            });
+          }
+
+          class _CounterPage extends StatefulWidget {
+            const _CounterPage();
+
+            @override
+            State<_CounterPage> createState() => _CounterPageState();
+          }
+
+          class _CounterPageState extends State<_CounterPage> {
+            int _count = 0;
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: Center(child: Text('Count: $_count')),
+                floatingActionButton: FloatingActionButton(
+                  onPressed: () => setState(() => _count++),
+                  child: const Icon(Icons.add),
+                ),
+              );
+            }
+          }
+          DART
+
+      - name: Run patrol test on Linux
+        working-directory: /tmp/desktop_test_app
+        run: xvfb-run patrol test -d linux --target patrol_test/desktop_smoke_test.dart --verbose
+
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Activate patrol_cli from source
+        run: dart pub global activate --source path packages/patrol_cli
+
+      - name: Create minimal desktop test app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:TEMP\desktop_test_app | Out-Null
+          Set-Location $env:TEMP\desktop_test_app
+          flutter create --platforms=windows . --project-name desktop_test_app
+          flutter pub add --dev patrol --path="${{ github.workspace }}\packages\patrol"
+          flutter pub get
+
+      - name: Create patrol test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:TEMP\desktop_test_app\patrol_test | Out-Null
+          @'
+          import 'package:flutter/material.dart';
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:patrol/patrol.dart';
+
+          void main() {
+            patrolTest('basic widget test on desktop', ($) async {
+              await $.pumpWidgetAndSettle(
+                MaterialApp(
+                  home: Scaffold(
+                    appBar: AppBar(title: const Text('Desktop Test')),
+                    body: const Center(child: Text('Hello Desktop')),
+                  ),
+                ),
+              );
+
+              expect($('Desktop Test'), findsOneWidget);
+              expect($('Hello Desktop'), findsOneWidget);
+            });
+
+            patrolTest('tap and state change on desktop', ($) async {
+              await $.pumpWidgetAndSettle(
+                MaterialApp(home: const _CounterPage()),
+              );
+
+              expect($('Count: 0'), findsOneWidget);
+              await $(FloatingActionButton).tap();
+              expect($('Count: 1'), findsOneWidget);
+              await $(FloatingActionButton).tap();
+              expect($('Count: 2'), findsOneWidget);
+            });
+          }
+
+          class _CounterPage extends StatefulWidget {
+            const _CounterPage();
+
+            @override
+            State<_CounterPage> createState() => _CounterPageState();
+          }
+
+          class _CounterPageState extends State<_CounterPage> {
+            int _count = 0;
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                body: Center(child: Text('Count: $_count')),
+                floatingActionButton: FloatingActionButton(
+                  onPressed: () => setState(() => _count++),
+                  child: const Icon(Icons.add),
+                ),
+              );
+            }
+          }
+          '@ | Set-Content -Path "$env:TEMP\desktop_test_app\patrol_test\desktop_smoke_test.dart"
+
+      - name: Run patrol test on Windows
+        shell: pwsh
+        run: |
+          Set-Location $env:TEMP\desktop_test_app
+          patrol test -d windows --target patrol_test/desktop_smoke_test.dart --verbose
