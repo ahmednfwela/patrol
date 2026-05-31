@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:patrol_cli/patrol_cli.dart';
 
+import 'cdp_service.dart';
 import 'log_streaming.dart';
 
 /// An [io.Stdout] wrapper that forwards writes to [_inner] (e.g. stderr) and
@@ -154,6 +155,8 @@ class PatrolStatus {
     this.deviceName,
     this.deviceId,
     this.devicePlatform,
+    this.browserErrors = const [],
+    this.browserLogs = const [],
   });
 
   final bool isDevelopRunning;
@@ -164,6 +167,8 @@ class PatrolStatus {
   final String? deviceName;
   final String? deviceId;
   final String? devicePlatform;
+  final List<String> browserErrors;
+  final List<String> browserLogs;
 
   String get summary => testState.summary;
 
@@ -177,6 +182,8 @@ class PatrolStatus {
     'devicePlatform': ?devicePlatform,
     'output': output,
     'summary': summary,
+    if (browserErrors.isNotEmpty) 'browserErrors': browserErrors,
+    if (browserLogs.isNotEmpty) 'browserLogs': browserLogs,
   };
 }
 
@@ -206,9 +213,23 @@ final class PatrolSession {
 
   final _logStreaming = LogStreaming.instance;
 
+  CdpService? _cdpService;
+
   /// The device discovered by the last [startAndWait] call.
   Device? get device => _developService?.device;
   int? get testServerPort => _testServerPort;
+
+  /// The Chrome DevTools debugger port, if running a web session.
+  int? get webDebuggerPort => _developService?.webDebuggerPort;
+
+  /// CDP service for web screenshot/video, lazily created.
+  CdpService? get cdpService {
+    final port = webDebuggerPort;
+    if (port == null) {
+      return null;
+    }
+    return _cdpService ??= CdpService(debuggerPort: port);
+  }
 
   /// Returns null if started successfully, or a warning message if blocked
   Future<String?> _start(String testFile) async {
@@ -293,6 +314,13 @@ final class PatrolSession {
     // hot restart in develop mode).
     _runDevelopSession(developService, options, exitCompleter, logger);
 
+    // Start CDP connection attempts early so we capture browser console errors
+    // (e.g. engine initialization failures, assertions) that fire within the
+    // first seconds of Chrome starting.  The retry loop inside _tryConnectCdp
+    // handles the fact that the debugger port won't be available until Chrome
+    // is actually running (~20-30 s into the build).
+    unawaited(_tryConnectCdp());
+
     return null;
   }
 
@@ -352,6 +380,13 @@ final class PatrolSession {
     _isRunning = false;
     _currentTestFile = null;
     _testServerPort = null;
+
+    try {
+      await _cdpService?.disconnect();
+    } catch (e) {
+      logger.fine('Error disconnecting CDP: $e');
+    }
+    _cdpService = null;
 
     await _logStreaming.stopLogging();
 
@@ -445,6 +480,7 @@ final class PatrolSession {
       }
 
       _outputs.clear();
+      _cdpService?.clearConsole();
       _testState = TestState.running;
       // Complete the old completer so any previous waiters are unblocked, then
       // immediately create a fresh one. This avoids a race where callbacks
@@ -460,6 +496,7 @@ final class PatrolSession {
 
   PatrolStatus getStatus() {
     final dev = _developService?.device;
+    final cdp = _cdpService;
     return PatrolStatus(
       isDevelopRunning: _isRunning,
       testState: _testState,
@@ -468,6 +505,8 @@ final class PatrolSession {
       deviceName: dev?.name,
       deviceId: dev?.id,
       devicePlatform: dev?.targetPlatform.name,
+      browserErrors: cdp?.consoleErrors ?? const [],
+      browserLogs: cdp?.consoleLogs ?? const [],
     );
   }
 
@@ -529,6 +568,30 @@ final class PatrolSession {
       );
     }
     return _waitForFinish(timeout: timeout);
+  }
+
+  /// Attempts to connect CDP to capture browser console errors.
+  /// Retries a few times since Chrome may still be starting.
+  Future<void> _tryConnectCdp() async {
+    final logger = Logger('PatrolSession');
+    for (var attempt = 0; attempt < 10; attempt++) {
+      final port = webDebuggerPort;
+      if (port != null) {
+        try {
+          final cdp = cdpService;
+          await cdp?.connect();
+          logger.info('CDP connected for console capture (port $port)');
+          return;
+        } catch (e) {
+          logger.fine('CDP connect attempt $attempt failed: $e');
+        }
+      }
+      await Future<void>.delayed(const Duration(seconds: 3));
+      if (!_isRunning) {
+        return;
+      }
+    }
+    logger.info('CDP console capture not available (Chrome may not be ready)');
   }
 
   /// Automatically start log streaming and optionally launch terminal

@@ -3,8 +3,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
+import 'package:logging/logging.dart' as logging;
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:patrol_cli/patrol_cli.dart' show Device, TargetPlatform;
+
+import 'cdp_service.dart';
 
 enum ScreenshotPlatform {
   android('adb', ['exec-out', 'screencap', '-p']),
@@ -27,16 +30,22 @@ enum ScreenshotPlatform {
         TargetPlatform.android => ScreenshotPlatform.android,
         TargetPlatform.iOS => ScreenshotPlatform.ios,
         _ => throw ArgumentError(
-          'Screenshot not supported for platform: '
-          '${device.targetPlatform.name}',
+          'Native screenshot not supported for platform: '
+          '${device.targetPlatform.name}. '
+          'Use CDP for web screenshots.',
         ),
       };
 }
 
 abstract final class ScreenshotService {
+  static final _logger = logging.Logger('ScreenshotService');
   static const _maxHeight = 800;
 
-  static Future<CallToolResult> handleScreenshotRequest(Device? device) async {
+  static Future<CallToolResult> handleScreenshotRequest(
+    Device? device, {
+    int? webDebuggerPort,
+    CdpService? cdpService,
+  }) async {
     try {
       if (device == null) {
         return const CallToolResult(
@@ -51,16 +60,21 @@ abstract final class ScreenshotService {
         );
       }
 
+      if (device.targetPlatform == TargetPlatform.web) {
+        return _handleWebScreenshot(
+          webDebuggerPort: webDebuggerPort,
+          cdpService: cdpService,
+        );
+      }
+
       final platform = ScreenshotPlatform.fromDevice(device);
-      final bytes = await _captureScreenshot(platform);
+      final bytes = await _captureNativeScreenshot(platform);
       final base64Data = base64Encode(bytes);
 
       return CallToolResult(
         content: [ImageContent(data: base64Data, mimeType: 'image/png')],
       );
     } catch (e) {
-      // Catches both Exception and Error (e.g. ArgumentError from
-      // unsupported platform).
       return CallToolResult(
         content: [TextContent(text: 'Failed to capture screenshot: $e')],
         isError: true,
@@ -68,27 +82,59 @@ abstract final class ScreenshotService {
     }
   }
 
-  static Future<Uint8List> _captureScreenshot(
-    ScreenshotPlatform platform,
-  ) async {
-    final process = await Process.start(platform.command, platform.args);
-
-    final bytes = await process.stdout.expand((chunk) => chunk).toList();
-
-    final exitCode = await process.exitCode;
-    if (exitCode != 0) {
-      final stderr = await process.stderr.transform(utf8.decoder).join();
-      throw Exception('Failed to capture screenshot: $stderr');
+  static Future<CallToolResult> _handleWebScreenshot({
+    int? webDebuggerPort,
+    CdpService? cdpService,
+  }) async {
+    if (webDebuggerPort == null && cdpService == null) {
+      return const CallToolResult(
+        content: [
+          TextContent(
+            text: 'Web session detected but no debugger port available. '
+                'Ensure the web develop session is fully started.',
+          ),
+        ],
+        isError: true,
+      );
     }
 
-    final rawBytes = Uint8List.fromList(bytes);
+    final service =
+        cdpService ?? CdpService(debuggerPort: webDebuggerPort!);
+    try {
+      final bytes = await service.captureScreenshot();
+      final resized = _resizeImage(bytes);
+      final base64Data = base64Encode(resized);
+
+      return CallToolResult(
+        content: [ImageContent(data: base64Data, mimeType: 'image/png')],
+      );
+    } catch (e) {
+      return CallToolResult(
+        content: [
+          TextContent(text: 'Failed to capture web screenshot via CDP: $e'),
+        ],
+        isError: true,
+      );
+    }
+  }
+
+  static Future<Uint8List> _captureNativeScreenshot(
+    ScreenshotPlatform platform,
+  ) async {
+    final result = await Process.run(platform.command, platform.args,
+        stdoutEncoding: null);
+
+    if (result.exitCode != 0) {
+      throw Exception(
+        'Failed to capture screenshot: ${result.stderr}',
+      );
+    }
+
+    final rawBytes = result.stdout as Uint8List;
     _validatePng(rawBytes);
     return _resizeImage(rawBytes);
   }
 
-  /// Throws if the captured bytes don't start with a valid PNG header.
-  /// Any text that `screencap` printed to stdout before the image data
-  /// is included in the exception message so users can diagnose the issue.
   static void _validatePng(Uint8List bytes) {
     const pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -117,7 +163,8 @@ abstract final class ScreenshotService {
 
       final resized = img.copyResize(image, height: _maxHeight);
       return Uint8List.fromList(img.encodePng(resized));
-    } on Exception {
+    } on Exception catch (e) {
+      _logger.warning('Failed to decode/resize image, returning raw: $e');
       return bytes;
     }
   }
