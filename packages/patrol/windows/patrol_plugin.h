@@ -37,6 +37,7 @@ class PatrolPlugin : public flutter::Plugin {
 
   IUIAutomation* automation_ = nullptr;
   bool initialized_ = false;
+  bool com_initialized_by_us_ = false;
 };
 
 }  // namespace patrol

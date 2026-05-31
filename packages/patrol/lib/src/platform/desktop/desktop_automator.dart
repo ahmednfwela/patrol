@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/services.dart';
+import 'package:patrol/src/platform/current.dart' as current_platform;
 
 const _channel = MethodChannel('pl.leancode.patrol/desktopAutomator');
 
@@ -146,11 +145,7 @@ class DesktopAutomator {
     config.logger('markPatrolAppServiceReady() - no-op on desktop');
   }
 
-  static bool get isSupported => Platform.isLinux || Platform.isWindows;
-
-  void _warnUnsupported(String method) {
-    config.logger('$method is not supported on desktop - skipping');
-  }
-
-  Future<void> noopWarn(String method) async => _warnUnsupported(method);
+  /// Whether the current platform supports desktop automation.
+  static bool get isSupported =>
+      current_platform.isLinux || current_platform.isWindows;
 }

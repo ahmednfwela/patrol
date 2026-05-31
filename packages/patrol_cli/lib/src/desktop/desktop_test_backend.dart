@@ -88,7 +88,7 @@ class DesktopTestBackend {
       {
         final appProcess = await _launchApp(options);
         try {
-          await _waitForAppService(baseUri);
+          await _waitForAppServiceOrCrash(baseUri, appProcess);
 
           final tests = await _listDartTests(baseUri);
           testNames.addAll(tests);
@@ -125,7 +125,7 @@ class DesktopTestBackend {
         final testName = testNames[i];
         final appProcess = await _launchApp(options);
         try {
-          await _waitForAppService(baseUri);
+          await _waitForAppServiceOrCrash(baseUri, appProcess);
           final result = await _runDartTest(baseUri, testName);
           _logTestResult(testName, result);
           switch (result) {
@@ -170,10 +170,9 @@ class DesktopTestBackend {
     );
 
     final binaryDir = File(binaryPath).parent.path;
-    final process = await _processManager.start(
-      [binaryPath],
-      workingDirectory: binaryDir,
-    );
+    final process = await _processManager.start([
+      binaryPath,
+    ], workingDirectory: binaryDir);
 
     process
         .listenStdOut((l) => _logger.detail('[app] $l'))
@@ -220,12 +219,15 @@ class DesktopTestBackend {
     );
   }
 
-  Future<void> _waitForAppService(Uri baseUri) async {
+  Future<void> _waitForAppServiceOrCrash(
+    Uri baseUri,
+    Process appProcess,
+  ) async {
     _logger.detail('Waiting for PatrolAppService at $baseUri ...');
-    final deadline = DateTime.now().add(_kServerReadyTimeout);
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 2);
 
-    try {
+    final serverReady = () async {
+      final deadline = DateTime.now().add(_kServerReadyTimeout);
       while (DateTime.now().isBefore(deadline)) {
         try {
           final request = await client.getUrl(
@@ -246,24 +248,39 @@ class DesktopTestBackend {
         }
         await Future<void>.delayed(_kServerPollInterval);
       }
+      throwToolExit(
+        'Timed out waiting for PatrolAppService to start on $baseUri '
+        '(after ${_kServerReadyTimeout.inSeconds}s)',
+      );
+    }();
+
+    final appCrash = appProcess.exitCode.then((code) {
+      throwToolExit(
+        'App exited with code $code before PatrolAppService was ready',
+      );
+    });
+
+    try {
+      await Future.any([serverReady, appCrash]);
     } finally {
       client.close();
     }
-
-    throwToolExit(
-      'Timed out waiting for PatrolAppService to start on $baseUri '
-      '(after ${_kServerReadyTimeout.inSeconds}s)',
-    );
   }
 
   Future<List<String>> _listDartTests(Uri baseUri) async {
-    final client = HttpClient();
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.getUrl(
         baseUri.replace(path: 'listDartTests'),
       );
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != 200) {
+        throwToolExit(
+          'listDartTests failed (status ${response.statusCode}): $body',
+        );
+      }
       final json = jsonDecode(body) as Map<String, dynamic>;
       final group = json['group'] as Map<String, dynamic>;
       return _flattenTests(group, '');
@@ -295,15 +312,26 @@ class DesktopTestBackend {
 
   Future<String> _runDartTest(Uri baseUri, String testName) async {
     _logger.info('Running test: $testName');
-    final client = HttpClient();
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.postUrl(
         baseUri.replace(path: 'runDartTest'),
       );
       request.headers.contentType = ContentType.json;
       request.write(jsonEncode({'name': testName}));
-      final response = await request.close();
+      final response = await request.close().timeout(
+        const Duration(minutes: 10),
+        onTimeout: () => throw TimeoutException(
+          'Test "$testName" did not complete within 10 minutes',
+        ),
+      );
       final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != 200) {
+        throwToolExit(
+          'runDartTest failed (status ${response.statusCode}): $body',
+        );
+      }
       final json = jsonDecode(body) as Map<String, dynamic>;
       return json['result'] as String? ?? 'failure';
     } finally {

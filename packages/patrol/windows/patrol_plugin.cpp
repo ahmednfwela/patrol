@@ -96,14 +96,20 @@ PatrolPlugin::~PatrolPlugin() {
     automation_->Release();
     automation_ = nullptr;
   }
-  CoUninitialize();
+  if (com_initialized_by_us_) {
+    CoUninitialize();
+  }
 }
 
 bool PatrolPlugin::EnsureInitialized() {
   if (initialized_) return true;
 
-  HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) return false;
+  HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  if (SUCCEEDED(hr)) {
+    com_initialized_by_us_ = true;
+  } else if (hr != RPC_E_CHANGED_MODE) {
+    return false;
+  }
 
   hr = CoCreateInstance(__uuidof(CUIAutomation), nullptr, CLSCTX_INPROC_SERVER,
                         __uuidof(IUIAutomation),
@@ -123,31 +129,40 @@ IUIAutomationElement* PatrolPlugin::FindElementByProperties(
   automation_->GetRootElement(&root);
   if (!root) return nullptr;
 
-  IUIAutomationCondition* condition = nullptr;
+  // Build conditions - AND them together if multiple are specified
+  std::vector<IUIAutomationCondition*> conditions;
 
-  if (name) {
+  auto addPropCondition = [&](PROPERTYID propId, const std::string& value) {
     VARIANT val;
     val.vt = VT_BSTR;
-    val.bstrVal = SysAllocString(Utf8ToWide(*name).c_str());
-    automation_->CreatePropertyCondition(UIA_NamePropertyId, val, &condition);
+    val.bstrVal = SysAllocString(Utf8ToWide(value).c_str());
+    IUIAutomationCondition* cond = nullptr;
+    automation_->CreatePropertyCondition(propId, val, &cond);
     SysFreeString(val.bstrVal);
-  } else if (automationId) {
-    VARIANT val;
-    val.vt = VT_BSTR;
-    val.bstrVal = SysAllocString(Utf8ToWide(*automationId).c_str());
-    automation_->CreatePropertyCondition(UIA_AutomationIdPropertyId, val,
-                                         &condition);
-    SysFreeString(val.bstrVal);
-  } else if (className) {
-    VARIANT val;
-    val.vt = VT_BSTR;
-    val.bstrVal = SysAllocString(Utf8ToWide(*className).c_str());
-    automation_->CreatePropertyCondition(UIA_ClassNamePropertyId, val,
-                                         &condition);
-    SysFreeString(val.bstrVal);
-  } else {
+    if (cond) conditions.push_back(cond);
+  };
+
+  if (name) addPropCondition(UIA_NamePropertyId, *name);
+  if (automationId) addPropCondition(UIA_AutomationIdPropertyId, *automationId);
+  if (className) addPropCondition(UIA_ClassNamePropertyId, *className);
+
+  if (conditions.empty()) {
     root->Release();
     return nullptr;
+  }
+
+  IUIAutomationCondition* condition = nullptr;
+  if (conditions.size() == 1) {
+    condition = conditions[0];
+  } else {
+    IUIAutomationCondition* combined = conditions[0];
+    for (size_t i = 1; i < conditions.size(); i++) {
+      IUIAutomationCondition* prev = combined;
+      automation_->CreateAndCondition(prev, conditions[i], &combined);
+      prev->Release();
+      conditions[i]->Release();
+    }
+    condition = combined;
   }
 
   if (!condition) {
@@ -391,6 +406,38 @@ void PatrolPlugin::HandleMethodCall(
     } else {
       result->Success();  // null
     }
+  } else if (method == "findElements") {
+    auto* name = GetOptionalString(args, "name");
+    auto* className = GetOptionalString(args, "className");
+    auto* automationId = GetOptionalString(args, "automationId");
+
+    IUIAutomationElement* root = nullptr;
+    automation_->GetRootElement(&root);
+    flutter::EncodableList list;
+    if (root) {
+      auto* el = FindElementByProperties(name, className, automationId, 500);
+      while (el) {
+        flutter::EncodableMap map;
+        BSTR bstrName;
+        if (SUCCEEDED(el->get_CurrentName(&bstrName)) && bstrName) {
+          map[flutter::EncodableValue("name")] =
+              flutter::EncodableValue(WideToUtf8(bstrName));
+          SysFreeString(bstrName);
+        }
+        RECT rect;
+        if (SUCCEEDED(el->get_CurrentBoundingRectangle(&rect))) {
+          map[flutter::EncodableValue("x")] =
+              flutter::EncodableValue(static_cast<double>(rect.left));
+          map[flutter::EncodableValue("y")] =
+              flutter::EncodableValue(static_cast<double>(rect.top));
+        }
+        list.push_back(flutter::EncodableValue(map));
+        el->Release();
+        break;  // FindElementByProperties returns first match only for now
+      }
+      root->Release();
+    }
+    result->Success(flutter::EncodableValue(list));
   } else if (method == "pressKey") {
     int keyCode = GetOptionalInt(args, "keyCode", 0);
     bool shift = GetOptionalBool(args, "shift", false);

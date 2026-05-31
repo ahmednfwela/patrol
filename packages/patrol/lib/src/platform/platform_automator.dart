@@ -1118,7 +1118,9 @@ class PlatformAction {
       if (desktop != null) {
         return desktop();
       }
-      return macos();
+      throw UnsupportedError(
+        'No desktop handler provided for this action on Linux/Windows',
+      );
     }
 
     throw UnsupportedError('Unknown platform');
@@ -1128,6 +1130,12 @@ class PlatformAction {
   T mobile<T>({required T Function() android, required T Function() ios}) {
     T error() => throw UnsupportedError('Unsupported platform');
 
-    return safe(android: android, ios: ios, web: error, macos: error);
+    return safe(
+      android: android,
+      ios: ios,
+      web: error,
+      macos: error,
+      desktop: error,
+    );
   }
 }
