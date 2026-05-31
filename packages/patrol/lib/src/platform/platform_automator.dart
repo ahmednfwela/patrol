@@ -291,6 +291,10 @@ class MobileAutomator {
     return platform.action.mobile(
       android: () => platform.android.tap(selector.android, timeout: timeout),
       ios: () => platform.ios.tap(selector.ios, timeout: timeout),
+      desktop: () => platform.desktop.tap(
+        name: selector.android.text,
+        className: selector.android.className,
+      ),
     );
   }
 
@@ -321,6 +325,10 @@ class MobileAutomator {
       ),
       ios: () =>
           platform.ios.doubleTap(selector.ios, timeout: timeout, appId: appId),
+      desktop: () => platform.desktop.doubleTap(
+        name: selector.android.text,
+        className: selector.android.className,
+      ),
     );
   }
 
@@ -331,6 +339,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: () => platform.android.tapAt(location),
       ios: () => platform.ios.tapAt(location, appId: appId),
+      desktop: () => platform.desktop.tapAt(location.dx, location.dy),
     );
   }
 
@@ -369,6 +378,11 @@ class MobileAutomator {
         keyboardBehavior: keyboardBehavior,
         timeout: timeout,
         tapLocation: tapLocation,
+      ),
+      desktop: () => platform.desktop.enterText(
+        text: text,
+        name: selector.android.text,
+        className: selector.android.className,
       ),
     );
   }
@@ -773,6 +787,15 @@ class MobileAutomator {
         appId: appId,
         timeout: timeout,
       ),
+      desktop: () async {
+        final visible = await platform.desktop.isElementVisible(
+          name: selector.android.text,
+          className: selector.android.className,
+        );
+        if (!visible) {
+          throw Exception('Element not visible: ${selector.android.text}');
+        }
+      },
     );
   }
 
@@ -787,6 +810,7 @@ class MobileAutomator {
       android: () =>
           platform.android.isPermissionDialogVisible(timeout: timeout),
       ios: () => platform.ios.isPermissionDialogVisible(timeout: timeout),
+      desktop: () => platform.desktop.isElementVisible(name: 'Allow'),
     );
   }
 
@@ -807,6 +831,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: platform.android.grantPermissionWhenInUse,
       ios: platform.ios.grantPermissionWhenInUse,
+      desktop: () => platform.desktop.tap(name: 'Allow'),
     );
   }
 
@@ -834,6 +859,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: platform.android.grantPermissionOnlyThisTime,
       ios: platform.ios.grantPermissionOnlyThisTime,
+      desktop: () => platform.desktop.tap(name: 'Allow'),
     );
   }
 
@@ -854,6 +880,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: platform.android.denyPermission,
       ios: platform.ios.denyPermission,
+      desktop: () => platform.desktop.tap(name: 'Deny'),
     );
   }
 
@@ -1126,8 +1153,14 @@ class PlatformAction {
     throw UnsupportedError('Unknown platform');
   }
 
-  /// Calls the action for mobile platforms (Android or iOS).
-  T mobile<T>({required T Function() android, required T Function() ios}) {
+  /// Calls the action for mobile platforms (Android or iOS), with optional
+  /// desktop fallback. When [desktop] is provided, it runs on Linux/Windows
+  /// instead of throwing.
+  T mobile<T>({
+    required T Function() android,
+    required T Function() ios,
+    T Function()? desktop,
+  }) {
     T error() => throw UnsupportedError('Unsupported platform');
 
     return safe(
@@ -1135,7 +1168,7 @@ class PlatformAction {
       ios: ios,
       web: error,
       macos: error,
-      desktop: error,
+      desktop: desktop ?? error,
     );
   }
 }
