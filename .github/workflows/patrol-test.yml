@@ -1,0 +1,368 @@
+name: Patrol Test (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      platforms:
+        description: 'Comma-separated list of platforms to test: android,ios,macos,web,linux,windows'
+        required: false
+        type: string
+        default: 'linux,windows'
+      flutter-version:
+        description: 'Flutter version to use'
+        required: false
+        type: string
+        default: '3.38.x'
+      flutter-channel:
+        description: 'Flutter channel'
+        required: false
+        type: string
+        default: 'stable'
+      working-directory:
+        description: 'Path to the Flutter project root'
+        required: false
+        type: string
+        default: '.'
+      test-target:
+        description: 'Test target path (e.g., patrol_test/app_test.dart)'
+        required: false
+        type: string
+        default: ''
+      patrol-version:
+        description: 'patrol_cli version to activate (leave empty for latest)'
+        required: false
+        type: string
+        default: ''
+      coverage:
+        description: 'Collect code coverage'
+        required: false
+        type: boolean
+        default: false
+      android-api-level:
+        description: 'Android emulator API level'
+        required: false
+        type: number
+        default: 34
+      ios-simulator:
+        description: 'iOS simulator device name'
+        required: false
+        type: string
+        default: 'iPhone 16'
+      ios-version:
+        description: 'iOS simulator runtime version'
+        required: false
+        type: string
+        default: 'latest'
+      verbose:
+        description: 'Pass --verbose to patrol test'
+        required: false
+        type: boolean
+        default: false
+      setup-command:
+        description: 'Command to resolve dependencies. Override for monorepos (e.g., "dart pub global activate melos && melos bootstrap")'
+        required: false
+        type: string
+        default: 'flutter pub get'
+      patrol-cli-setup:
+        description: 'Command to install patrol_cli. Override to activate from source (e.g., "dart pub global activate --source path packages/patrol_cli")'
+        required: false
+        type: string
+        default: 'dart pub global activate patrol_cli'
+
+permissions:
+  contents: read
+
+jobs:
+  detect-platforms:
+    runs-on: ubuntu-latest
+    outputs:
+      run-android: ${{ contains(inputs.platforms, 'android') }}
+      run-ios: ${{ contains(inputs.platforms, 'ios') }}
+      run-macos: ${{ contains(inputs.platforms, 'macos') }}
+      run-web: ${{ contains(inputs.platforms, 'web') }}
+      run-linux: ${{ contains(inputs.platforms, 'linux') }}
+      run-windows: ${{ contains(inputs.platforms, 'windows') }}
+    steps:
+      - run: echo "Detecting platforms from '${{ inputs.platforms }}'"
+
+  test-android:
+    needs: detect-platforms
+    if: needs.detect-platforms.outputs.run-android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter-version }}
+          channel: ${{ inputs.flutter-channel }}
+          cache: true
+
+      - name: Install patrol_cli
+        run: ${{ inputs.patrol-cli-setup }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.setup-command }}
+
+      - name: Build Android test APKs
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.test-target }}" ]; then
+            ARGS="--target ${{ inputs.test-target }}"
+          fi
+          patrol build android $ARGS
+
+      - name: Run Android tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ inputs.android-api-level }}
+          arch: x86_64
+          profile: pixel_7
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            cd ${{ inputs.working-directory }}
+            ARGS="-d emulator-5554"
+            if [ -n "${{ inputs.test-target }}" ]; then
+              ARGS="$ARGS --target ${{ inputs.test-target }}"
+            fi
+            if [ "${{ inputs.verbose }}" = "true" ]; then
+              ARGS="$ARGS --verbose"
+            fi
+            if [ "${{ inputs.coverage }}" = "true" ]; then
+              ARGS="$ARGS --coverage"
+            fi
+            patrol test $ARGS
+
+      - name: Upload coverage
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-android
+          path: ${{ inputs.working-directory }}/coverage/
+
+  test-ios:
+    needs: detect-platforms
+    if: needs.detect-platforms.outputs.run-ios == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter-version }}
+          channel: ${{ inputs.flutter-channel }}
+          cache: true
+
+      - name: Install patrol_cli
+        run: ${{ inputs.patrol-cli-setup }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.setup-command }}
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE="${{ inputs.ios-simulator }}"
+          RUNTIME_ID=$(xcrun simctl list runtimes iOS -j | python3 -c "
+          import json,sys
+          runtimes = json.load(sys.stdin)['runtimes']
+          print(runtimes[-1]['identifier'])
+          ")
+          UDID=$(xcrun simctl create "patrol-test" "$DEVICE" "$RUNTIME_ID")
+          xcrun simctl boot "$UDID" || true
+          echo "PATROL_IOS_UDID=$UDID" >> $GITHUB_ENV
+
+      - name: Run iOS tests
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          ARGS="-d $PATROL_IOS_UDID"
+          if [ -n "${{ inputs.test-target }}" ]; then
+            ARGS="$ARGS --target ${{ inputs.test-target }}"
+          fi
+          if [ "${{ inputs.verbose }}" = "true" ]; then
+            ARGS="$ARGS --verbose"
+          fi
+          patrol test $ARGS
+
+      - name: Shutdown simulator
+        if: always()
+        run: xcrun simctl shutdown "$PATROL_IOS_UDID" || true
+
+  test-macos:
+    needs: detect-platforms
+    if: needs.detect-platforms.outputs.run-macos == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter-version }}
+          channel: ${{ inputs.flutter-channel }}
+          cache: true
+
+      - name: Install patrol_cli
+        run: ${{ inputs.patrol-cli-setup }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.setup-command }}
+
+      - name: Run macOS tests
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          ARGS="-d macos"
+          if [ -n "${{ inputs.test-target }}" ]; then
+            ARGS="$ARGS --target ${{ inputs.test-target }}"
+          fi
+          if [ "${{ inputs.verbose }}" = "true" ]; then
+            ARGS="$ARGS --verbose"
+          fi
+          patrol test $ARGS
+
+  test-web:
+    needs: detect-platforms
+    if: needs.detect-platforms.outputs.run-web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter-version }}
+          channel: ${{ inputs.flutter-channel }}
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install patrol_cli
+        run: ${{ inputs.patrol-cli-setup }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.setup-command }}
+
+      - name: Run web tests
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          ARGS="-d web-server"
+          if [ -n "${{ inputs.test-target }}" ]; then
+            ARGS="$ARGS --target ${{ inputs.test-target }}"
+          fi
+          if [ "${{ inputs.verbose }}" = "true" ]; then
+            ARGS="$ARGS --verbose"
+          fi
+          patrol test $ARGS
+
+  test-linux:
+    needs: detect-platforms
+    if: needs.detect-platforms.outputs.run-linux == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libatspi2.0-dev at-spi2-core dbus-x11 xvfb xdotool
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter-version }}
+          channel: ${{ inputs.flutter-channel }}
+          cache: true
+
+      - name: Precache Linux artifacts
+        run: flutter precache --linux
+
+      - name: Install patrol_cli
+        run: ${{ inputs.patrol-cli-setup }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.setup-command }}
+
+      - name: Run Linux tests
+        working-directory: ${{ inputs.working-directory }}
+        timeout-minutes: 10
+        run: |
+          ARGS="-d linux"
+          if [ -n "${{ inputs.test-target }}" ]; then
+            ARGS="$ARGS --target ${{ inputs.test-target }}"
+          fi
+          if [ "${{ inputs.verbose }}" = "true" ]; then
+            ARGS="$ARGS --verbose"
+          fi
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            ARGS="$ARGS --coverage"
+          fi
+          dbus-run-session -- xvfb-run -a patrol test $ARGS
+
+      - name: Upload coverage
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-linux
+          path: ${{ inputs.working-directory }}/coverage/
+
+  test-windows:
+    needs: detect-platforms
+    if: needs.detect-platforms.outputs.run-windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter-version }}
+          channel: ${{ inputs.flutter-channel }}
+          cache: true
+
+      - name: Precache Windows artifacts
+        run: flutter precache --windows
+
+      - name: Install patrol_cli
+        run: ${{ inputs.patrol-cli-setup }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.setup-command }}
+
+      - name: Run Windows tests
+        shell: pwsh
+        working-directory: ${{ inputs.working-directory }}
+        timeout-minutes: 10
+        run: |
+          $args = @("-d", "windows")
+          if ("${{ inputs.test-target }}" -ne "") {
+            $args += @("--target", "${{ inputs.test-target }}")
+          }
+          if ("${{ inputs.verbose }}" -eq "true") {
+            $args += "--verbose"
+          }
+          if ("${{ inputs.coverage }}" -eq "true") {
+            $args += "--coverage"
+          }
+          patrol test @args
+
+      - name: Upload coverage
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-windows
+          path: ${{ inputs.working-directory }}/coverage/
