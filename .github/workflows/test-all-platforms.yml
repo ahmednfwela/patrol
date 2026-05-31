@@ -1,0 +1,96 @@
+name: Test All Platforms
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'packages/patrol/**'
+      - 'packages/patrol_cli/**'
+      - 'dev/e2e_app/**'
+      - '.github/workflows/test-all-platforms.yml'
+      - '.github/workflows/patrol-test.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'packages/patrol/**'
+      - 'packages/patrol_cli/**'
+      - 'dev/e2e_app/**'
+      - '.github/workflows/test-all-platforms.yml'
+      - '.github/workflows/patrol-test.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Analyze patrol
+        working-directory: packages/patrol
+        run: flutter analyze
+
+      - name: Analyze patrol_cli
+        working-directory: packages/patrol_cli
+        run: dart analyze
+
+      - name: Run patrol_cli unit tests
+        working-directory: packages/patrol_cli
+        run: dart test
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed packages/patrol/lib packages/patrol_cli/lib
+
+  analyze-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Analyze Windows C++ plugin
+        run: |
+          cppcheck --enable=warning,style,performance \
+            --error-exitcode=1 \
+            --suppress=missingInclude \
+            --suppress=unknownMacro \
+            packages/patrol/windows/patrol_plugin.cpp \
+            packages/patrol/windows/patrol_plugin_c_api.cpp
+
+      - name: Analyze Linux C plugin
+        run: |
+          cppcheck --enable=warning,style,performance \
+            --error-exitcode=1 \
+            --suppress=missingInclude \
+            --suppress=unknownMacro \
+            packages/patrol/linux/patrol_plugin.cc
+
+  test-platforms:
+    needs: [analyze, analyze-native]
+    uses: ./.github/workflows/patrol-test.yml
+    with:
+      platforms: 'linux,windows,web'
+      flutter-version: '3.32.x'
+      working-directory: 'dev/e2e_app'
+      test-target: 'patrol_test/macos/macos_app_test.dart'
+      verbose: true
+      coverage: true
