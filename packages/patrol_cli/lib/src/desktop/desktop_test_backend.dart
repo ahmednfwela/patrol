@@ -116,7 +116,7 @@ class DesktopTestBackend {
               failCount++;
           }
         } finally {
-          _killProcess(appProcess);
+          await _killProcess(appProcess);
         }
       }
 
@@ -137,7 +137,7 @@ class DesktopTestBackend {
               failCount++;
           }
         } finally {
-          _killProcess(appProcess);
+          await _killProcess(appProcess);
         }
       }
 
@@ -172,7 +172,6 @@ class DesktopTestBackend {
     final binaryDir = File(binaryPath).parent.path;
     final process = await _processManager.start(
       [binaryPath],
-      runInShell: true,
       workingDirectory: binaryDir,
     );
 
@@ -323,11 +322,18 @@ class DesktopTestBackend {
     }
   }
 
-  void _killProcess(Process process) {
+  Future<void> _killProcess(Process process) async {
+    process.kill();
     try {
-      process.kill();
-    } catch (_) {
-      // Process may have already exited
+      await process.exitCode.timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      _logger.detail('Graceful kill timed out, force killing...');
+      process.kill(ProcessSignal.sigkill);
+      try {
+        await process.exitCode.timeout(const Duration(seconds: 3));
+      } on TimeoutException {
+        _logger.detail('Force kill timed out, process may be orphaned');
+      }
     }
   }
 }
