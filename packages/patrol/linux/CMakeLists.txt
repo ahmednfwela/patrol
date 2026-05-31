@@ -23,8 +23,3 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
 
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter)
 target_link_libraries(${PLUGIN_NAME} PRIVATE PkgConfig::GTK)
-
-# AT-SPI2 for accessibility-based native automation
-pkg_check_modules(ATSPI REQUIRED atspi-2)
-target_include_directories(${PLUGIN_NAME} PRIVATE ${ATSPI_INCLUDE_DIRS})
-target_link_libraries(${PLUGIN_NAME} PRIVATE ${ATSPI_LIBRARIES})
