@@ -1,4 +1,4 @@
-import { defineConfig, PlaywrightTestOptions, ReporterDescription, VideoMode } from "@playwright/test"
+import { defineConfig, PlaywrightTestOptions, ReporterDescription, TraceMode, VideoMode } from "@playwright/test"
 
 const outputDir = process.env.PATROL_TEST_RESULTS_DIR || "./test-results"
 const outputFolder = process.env.PATROL_TEST_REPORT_DIR || "./playwright-report"
@@ -6,6 +6,7 @@ const baseURL = process.env.BASE_URL
 
 const retries = process.env.PATROL_WEB_RETRIES ? parseInt(process.env.PATROL_WEB_RETRIES) : undefined
 const video = process.env.PATROL_WEB_VIDEO ? (process.env.PATROL_WEB_VIDEO as VideoMode) : undefined
+const trace = process.env.PATROL_WEB_TRACE ? (process.env.PATROL_WEB_TRACE as TraceMode) : undefined
 const timeout = process.env.PATROL_WEB_TIMEOUT ? parseInt(process.env.PATROL_WEB_TIMEOUT) : undefined
 const globalTimeout = process.env.PATROL_WEB_GLOBAL_TIMEOUT
   ? parseInt(process.env.PATROL_WEB_GLOBAL_TIMEOUT)
@@ -41,6 +42,7 @@ export default defineConfig({
     baseURL,
     headless,
     video,
+    trace,
     locale,
     timezoneId,
     colorScheme,

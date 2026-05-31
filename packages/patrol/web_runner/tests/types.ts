@@ -4,6 +4,12 @@ declare global {
     __patrol__runTest?: (name: string) => Promise<PatrolTestResult>
     __patrol__onInitialised?: () => void
     __patrol__isInitialised?: boolean
+
+    // DWDS (Dart Web Debug Service) globals — set by DDC bootstrap in debug mode.
+    // $dartRunMain starts the Dart entrypoint; DWDS normally calls it after
+    // connecting, but it may not fire for subsequent browser sessions.
+    $dartRunMain?: () => void
+    $dartMainExecuted?: boolean
   }
 }
 

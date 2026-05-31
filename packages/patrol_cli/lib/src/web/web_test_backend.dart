@@ -30,6 +30,11 @@ class WebTestBackend {
   final Logger _logger;
   final DisposeScope _disposeScope;
 
+  int? _webDebuggerPort;
+
+  /// The Chrome DevTools debugger port discovered during [develop].
+  int? get webDebuggerPort => _webDebuggerPort;
+
   Future<void> build(WebAppOptions options) async {
     _logger.detail('Building web app for testing...');
 
@@ -119,8 +124,13 @@ class WebTestBackend {
     final flutterProcess = await _startFlutterWebServer(options, develop: true);
 
     StdinModes? previousStdinModes;
-    if (io.stdin.hasTerminal) {
-      previousStdinModes = flutterTool.enableInteractiveMode();
+    try {
+      if (io.stdin.hasTerminal) {
+        previousStdinModes = flutterTool.enableInteractiveMode();
+      }
+    } on io.StdinException {
+      // MCP or CI environments may report hasTerminal=true but fail
+      // to access terminal modes. Safe to continue without interactive mode.
     }
 
     try {
@@ -129,6 +139,7 @@ class WebTestBackend {
         flutterProcess,
         serverTimeout: options.serverTimeout,
       );
+      _webDebuggerPort = int.parse(port);
 
       _attachForHotRestart(flutterProcess, switch (previousStdinModes) {
         final stdinModes? => () => flutterTool.revertInteractiveMode(
@@ -140,6 +151,8 @@ class WebTestBackend {
       // Run Playwright tests
       await _runPlaywrightDevelop(port, options);
     } finally {
+      _webDebuggerPort = null;
+
       if (previousStdinModes != null) {
         flutterTool.revertInteractiveMode(previousStdinModes);
       }
@@ -450,6 +463,7 @@ class WebTestBackend {
               ['npx', 'playwright', 'test', 'tests/test.spec.ts'],
               workingDirectory: webRunnerPath,
               environment: {
+                ...Platform.environment,
                 'BASE_URL': baseUrl,
                 'PATROL_TEST_RESULTS_DIR': testResultsDir,
                 'PATROL_TEST_REPORT_DIR': testReportDir,
@@ -457,6 +471,8 @@ class WebTestBackend {
                   'PATROL_WEB_RETRIES': options.retries.toString(),
                 if (options.video != null)
                   'PATROL_WEB_VIDEO': options.video.toString(),
+                if (options.trace != null)
+                  'PATROL_WEB_TRACE': options.trace.toString(),
                 if (options.timeout != null)
                   'PATROL_WEB_TIMEOUT': options.timeout.toString(),
                 if (options.workers != null)
@@ -483,9 +499,10 @@ class WebTestBackend {
                   'PATROL_WEB_SHARD': options.shard.toString(),
                 if (options.headless != null)
                   'PATROL_WEB_HEADLESS': options.headless.toString(),
+                if (options.initTimeout != null)
+                  'PATROL_WEB_INIT_TIMEOUT': options.initTimeout.toString(),
                 if (options.browserArgs != null)
                   'PATROL_WEB_BROWSER_ARGS': options.browserArgs.toString(),
-                ...Platform.environment,
               },
               runInShell: true,
             )
@@ -520,7 +537,7 @@ class WebTestBackend {
               .transform(const SystemEncoding().decoder)
               .transform(const LineSplitter())
               .listen((line) {
-                _logger.detail('Playwright stderr: $line');
+                _logger.info('Playwright stderr: $line');
               })
             ..disposedBy(scope);
 
@@ -571,12 +588,12 @@ class WebTestBackend {
       ['npx', 'ts-node', 'tests/develop.ts'],
       workingDirectory: webRunnerPath,
       environment: {
+        ...Platform.environment,
         'DEBUGGER_PORT': port,
         'PATROL_TEST_RESULTS_DIR': testResultsDir,
         'PATROL_TEST_REPORT_DIR': testReportDir,
         'PATROL_WEB_JSON_OUTPUT_NAME': 'results.json',
         'PATROL_WEB_JSON_OUTPUT_DIR': testReportDir,
-        ...Platform.environment,
       },
       runInShell: true,
     );
