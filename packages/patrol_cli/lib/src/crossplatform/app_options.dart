@@ -389,6 +389,45 @@ class MacOSAppOptions {
   }
 }
 
+class DesktopAppOptions {
+  const DesktopAppOptions({
+    required this.flutter,
+    required this.platform,
+    required this.appServerPort,
+  });
+
+  final FlutterAppOptions flutter;
+  final TargetPlatform platform;
+  final int appServerPort;
+
+  String get platformName =>
+      platform == TargetPlatform.linux ? 'linux' : 'windows';
+
+  String get description {
+    return 'app with entrypoint ${basename(flutter.target)} for $platformName';
+  }
+
+  List<String> toFlutterBuildInvocation() {
+    final cmd = [
+      flutter.command.executable,
+      ...flutter.command.arguments,
+      'build',
+      platformName,
+      '--target=${flutter.target}',
+      '--${flutter.buildMode.name}',
+      if (flutter.noTreeShakeIcons) '--no-tree-shake-icons',
+      ...flutter.dartDefines.entries.map(
+        (e) => '--dart-define=${e.key}=${e.value}',
+      ),
+      ...flutter.dartDefineFromFilePaths.map(
+        (e) => '--dart-define-from-file=$e',
+      ),
+    ];
+
+    return cmd;
+  }
+}
+
 class WebAppOptions {
   const WebAppOptions({
     required this.flutter,
@@ -396,6 +435,7 @@ class WebAppOptions {
     this.reportDir,
     this.retries,
     this.video,
+    this.trace,
     this.timeout,
     this.workers,
     this.reporter,
@@ -412,6 +452,7 @@ class WebAppOptions {
     this.webPort,
     this.serverTimeout,
     this.browserArgs,
+    this.initTimeout,
   });
 
   final FlutterAppOptions flutter;
@@ -419,6 +460,9 @@ class WebAppOptions {
   final String? reportDir;
   final int? retries;
   final String? video;
+
+  /// Trace mode for Playwright. Valid values: off, on, retain-on-failure, on-first-retry, on-all-retries.
+  final String? trace;
   final int? timeout;
   final int? workers;
   final String? reporter;
@@ -438,6 +482,11 @@ class WebAppOptions {
   /// Timeout in seconds for the web server to start.
   /// Defaults to 120 seconds (2 minutes) if not specified.
   final int? serverTimeout;
+
+  /// Timeout in milliseconds for the Flutter/Dart side to call back
+  /// __patrol__onInitialised during page initialisation.
+  /// Defaults to 120000 ms (2 minutes) if not specified.
+  final int? initTimeout;
 
   /// Translates these options into a proper flutter build invocation.
   List<String> toFlutterBuildInvocation() {

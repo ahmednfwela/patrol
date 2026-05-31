@@ -288,6 +288,13 @@ abstract class PatrolCommand extends Command<int> {
         valueHelp: 'off | on | retain-on-failure | on-first-retry',
       )
       ..addOption(
+        'web-trace',
+        help:
+            'Playwright trace recording mode. Traces can be viewed with `npx playwright show-report`.',
+        valueHelp:
+            'off | on | retain-on-failure | on-first-retry | on-all-retries',
+      )
+      ..addOption(
         'web-timeout',
         help: 'Maximum time in milliseconds for single test execution.',
         valueHelp: 'number',
@@ -367,6 +374,13 @@ abstract class PatrolCommand extends Command<int> {
         help:
             'Maximum time in seconds to wait for the Flutter web server to start. '
             'Defaults to 120 (2 minutes).',
+        valueHelp: 'number',
+      )
+      ..addOption(
+        'web-init-timeout',
+        help:
+            'Maximum time in milliseconds for Flutter to initialise during web tests. '
+            'Defaults to 120000 (2 minutes).',
         valueHelp: 'number',
       )
       ..addOption(

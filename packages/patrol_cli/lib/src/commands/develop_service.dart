@@ -92,6 +92,9 @@ class DevelopService {
   /// The device discovered during the last [run] call.
   Device? get device => _device;
 
+  /// The Chrome DevTools debugger port, if running a web session.
+  int? get webDebuggerPort => _webTestBackend.webDebuggerPort;
+
   /// Runs the full develop flow: discover device, read config, bundle test,
   /// build, execute, and attach for hot restart.
   Future<void> run(DevelopOptions options) async {
@@ -152,12 +155,14 @@ class DevelopService {
       throwToolExit('macOS is not supported with develop');
     }
 
-    // Changes applied outside `/lib` directory are not 'hot-restarted'.
-    // This is a blocker from applying changes to test code.
-    // https://github.com/flutter/flutter/issues/175318
-    if (device.targetPlatform == TargetPlatform.web) {
-      throwToolExit('Web is not supported with develop');
+    if (device.targetPlatform == TargetPlatform.linux ||
+        device.targetPlatform == TargetPlatform.windows) {
+      throwToolExit('Desktop (Linux/Windows) is not supported with develop');
     }
+
+    // Web develop works via flutter run -d chrome with CDP-based
+    // screenshot/video. Hot restart of test code is limited (changes
+    // outside /lib are not hot-restarted, see flutter#175318).
 
     _logger.detail('Received device: ${device.name} (${device.id})');
 
@@ -302,6 +307,8 @@ class DevelopService {
       TargetPlatform.iOS => () => _iosTestBackend.build(iosOpts),
       TargetPlatform.macOS => () => _macosTestBackend.build(macosOpts),
       TargetPlatform.web => () => _webTestBackend.buildForDevelop(webOpts),
+      TargetPlatform.linux ||
+      TargetPlatform.windows => throw StateError('unreachable'),
     };
 
     try {
@@ -344,6 +351,8 @@ class DevelopService {
         }
       case TargetPlatform.macOS:
       case TargetPlatform.web:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
     }
 
     try {
@@ -421,6 +430,9 @@ class DevelopService {
           clearTestSteps: clearTestSteps,
           stdin: _stdin,
         );
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        throw StateError('unreachable');
     }
 
     try {
@@ -480,10 +492,8 @@ class DevelopService {
     }
 
     subscriptions.add(ProcessSignal.sigint.watch().listen(cleanup));
-    try {
+    if (!Platform.isWindows) {
       subscriptions.add(ProcessSignal.sigterm.watch().listen(cleanup));
-    } catch (_) {
-      // Some platforms may not support sigterm.
     }
 
     return subscriptions;

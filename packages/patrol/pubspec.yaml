@@ -55,6 +55,10 @@ flutter:
       macos:
         pluginClass: PatrolPlugin
         sharedDarwinSource: true
+      linux:
+        pluginClass: PatrolPlugin
+      windows:
+        pluginClass: PatrolPlugin
       web:
 
 # These files don't contain real credentials. They exist only for build to pass.

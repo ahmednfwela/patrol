@@ -8,6 +8,7 @@ import 'package:patrol/src/platform/android/android_automator_empty.dart'
     as native_android_automator;
 import 'package:patrol/src/platform/contracts/contracts.dart';
 import 'package:patrol/src/platform/current.dart' as current_platform;
+import 'package:patrol/src/platform/desktop/desktop_automator.dart';
 import 'package:patrol/src/platform/ios/ios_automator.dart';
 import 'package:patrol/src/platform/ios/ios_automator_config.dart';
 import 'package:patrol/src/platform/ios/ios_automator_empty.dart'
@@ -27,7 +28,12 @@ import 'package:patrol/src/platform/web/web_automator_empty.dart'
 /// Configuration for [PlatformAutomator].
 class PlatformAutomatorConfig {
   /// Creates a new [PlatformAutomatorConfig].
-  PlatformAutomatorConfig({this.androidConfig, this.iosConfig, this.webConfig});
+  PlatformAutomatorConfig({
+    this.androidConfig,
+    this.iosConfig,
+    this.webConfig,
+    this.desktopConfig,
+  });
 
   /// Creates a new [PlatformAutomatorConfig] from individual options.
   factory PlatformAutomatorConfig.fromOptions({
@@ -97,6 +103,7 @@ class PlatformAutomatorConfig {
       androidConfig: const AndroidAutomatorConfig(),
       iosConfig: const IOSAutomatorConfig(),
       webConfig: const WebAutomatorConfig(),
+      desktopConfig: const DesktopAutomatorConfig(),
     );
   }
 
@@ -109,6 +116,9 @@ class PlatformAutomatorConfig {
   /// Configuration for Web platform.
   final WebAutomatorConfig? webConfig;
 
+  /// Configuration for desktop platforms (Linux/Windows).
+  final DesktopAutomatorConfig? desktopConfig;
+
   /// Whether Android platform is enabled.
   bool get androidEnabled => androidConfig != null;
 
@@ -117,6 +127,9 @@ class PlatformAutomatorConfig {
 
   /// Whether Web platform is enabled.
   bool get webEnabled => webConfig != null;
+
+  /// Whether desktop platform is enabled.
+  bool get desktopEnabled => desktopConfig != null;
 }
 
 /// Provides functionality to interact with the OS that the app under test is
@@ -158,6 +171,10 @@ class PlatformAutomator {
       fallback: () => empty_web_automator.WebAutomator(config: webConfig),
     );
 
+    final desktopConfig =
+        config?.desktopConfig ?? const DesktopAutomatorConfig();
+    desktop = DesktopAutomator(config: desktopConfig);
+
     mobile = MobileAutomator(platform: this);
   }
 
@@ -170,6 +187,9 @@ class PlatformAutomator {
   /// iOS-specific automator.
   late final IOSAutomator ios;
 
+  /// Desktop automator for Linux and Windows.
+  late final DesktopAutomator desktop;
+
   /// Mobile automator that works on both Android and iOS.
   late final MobileAutomator mobile;
 
@@ -178,7 +198,11 @@ class PlatformAutomator {
 
   /// Initializes the native automator.
   Future<void> initialize() async {
-    await action.maybe(android: android.initialize, web: web.initialize);
+    await action.maybe(
+      android: android.initialize,
+      web: web.initialize,
+      desktop: desktop.initialize,
+    );
   }
 
   /// Taps on the native view specified by [selector].
@@ -199,6 +223,10 @@ class PlatformAutomator {
       ios: () => ios.tap(selector.ios, appId: appId, timeout: timeout),
       web: () => web.tap(selector.web),
       macos: _throwOnMacOS,
+      desktop: () => desktop.tap(
+        name: selector.android.text,
+        className: selector.android.className,
+      ),
     );
   }
 
@@ -212,6 +240,7 @@ class PlatformAutomator {
       // For now we reuse the IOSAutomator for native communication on MacOS
       // The reason is that the only native interaction on MacOS is marking the app service ready
       macos: () async => {await ios.markPatrolAppServiceReady()},
+      desktop: () async => {await desktop.markPatrolAppServiceReady()},
     );
   }
 
@@ -270,6 +299,10 @@ class MobileAutomator {
     return platform.action.mobile(
       android: () => platform.android.tap(selector.android, timeout: timeout),
       ios: () => platform.ios.tap(selector.ios, timeout: timeout),
+      desktop: () => platform.desktop.tap(
+        name: selector.android.text,
+        className: selector.android.className,
+      ),
     );
   }
 
@@ -304,6 +337,10 @@ class MobileAutomator {
       ),
       ios: () =>
           platform.ios.doubleTap(selector.ios, timeout: timeout, appId: appId),
+      desktop: () => platform.desktop.doubleTap(
+        name: selector.android.text,
+        className: selector.android.className,
+      ),
     );
   }
 
@@ -318,6 +355,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: () => platform.android.tapAt(location),
       ios: () => platform.ios.tapAt(location, appId: appId),
+      desktop: () => platform.desktop.tapAt(location.dx, location.dy),
     );
   }
 
@@ -360,6 +398,11 @@ class MobileAutomator {
         keyboardBehavior: keyboardBehavior,
         timeout: timeout,
         tapLocation: tapLocation,
+      ),
+      desktop: () => platform.desktop.enterText(
+        text: text,
+        name: selector.android.text,
+        className: selector.android.className,
       ),
     );
   }
@@ -778,6 +821,15 @@ class MobileAutomator {
         appId: appId,
         timeout: timeout,
       ),
+      desktop: () async {
+        final visible = await platform.desktop.isElementVisible(
+          name: selector.android.text,
+          className: selector.android.className,
+        );
+        if (!visible) {
+          throw Exception('Element not visible: ${selector.android.text}');
+        }
+      },
     );
   }
 
@@ -792,6 +844,7 @@ class MobileAutomator {
       android: () =>
           platform.android.isPermissionDialogVisible(timeout: timeout),
       ios: () => platform.ios.isPermissionDialogVisible(timeout: timeout),
+      desktop: () => platform.desktop.isElementVisible(name: 'Allow'),
     );
   }
 
@@ -812,6 +865,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: platform.android.grantPermissionWhenInUse,
       ios: platform.ios.grantPermissionWhenInUse,
+      desktop: () => platform.desktop.tap(name: 'Allow'),
     );
   }
 
@@ -839,6 +893,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: platform.android.grantPermissionOnlyThisTime,
       ios: platform.ios.grantPermissionOnlyThisTime,
+      desktop: () => platform.desktop.tap(name: 'Allow'),
     );
   }
 
@@ -859,6 +914,7 @@ class MobileAutomator {
     return platform.action.mobile(
       android: platform.android.denyPermission,
       ios: platform.ios.denyPermission,
+      desktop: () => platform.desktop.tap(name: 'Deny'),
     );
   }
 
@@ -1043,6 +1099,7 @@ class PlatformAction {
     T Function()? ios,
     T Function()? web,
     T Function()? macos,
+    T Function()? desktop,
     T Function()? mobile,
   }) {
     final value = maybe(
@@ -1050,6 +1107,7 @@ class PlatformAction {
       ios: ios,
       web: web,
       macos: macos,
+      desktop: desktop,
       mobile: mobile,
     );
 
@@ -1066,6 +1124,7 @@ class PlatformAction {
     T Function()? ios,
     T Function()? web,
     T Function()? macos,
+    T Function()? desktop,
     T Function()? mobile,
   }) {
     T? empty() => null;
@@ -1075,6 +1134,7 @@ class PlatformAction {
       ios: ios ?? mobile ?? empty,
       web: web ?? empty,
       macos: macos ?? empty,
+      desktop: desktop ?? empty,
     );
   }
 
@@ -1084,6 +1144,7 @@ class PlatformAction {
     T Function()? ios,
     T Function()? web,
     T Function()? macos,
+    T Function()? desktop,
     T Function()? mobile,
     required T Function() fallback,
   }) {
@@ -1092,6 +1153,7 @@ class PlatformAction {
           ios: ios,
           web: web,
           macos: macos,
+          desktop: desktop,
           mobile: mobile,
         ) ??
         fallback();
@@ -1103,6 +1165,7 @@ class PlatformAction {
     required T Function() ios,
     required T Function() web,
     required T Function() macos,
+    T Function()? desktop,
   }) {
     if (current_platform.isAndroid) {
       return android();
@@ -1112,15 +1175,34 @@ class PlatformAction {
       return macos();
     } else if (current_platform.isWeb) {
       return web();
+    } else if (current_platform.isLinux || current_platform.isWindows) {
+      if (desktop != null) {
+        return desktop();
+      }
+      throw UnsupportedError(
+        'No desktop handler provided for this action on Linux/Windows',
+      );
     }
 
-    throw UnsupportedError('Unkown platform');
+    throw UnsupportedError('Unknown platform');
   }
 
-  /// Calls the action for mobile platforms (Android or iOS).
-  T mobile<T>({required T Function() android, required T Function() ios}) {
+  /// Calls the action for mobile platforms (Android or iOS), with optional
+  /// desktop fallback. When [desktop] is provided, it runs on Linux/Windows
+  /// instead of throwing.
+  T mobile<T>({
+    required T Function() android,
+    required T Function() ios,
+    T Function()? desktop,
+  }) {
     T error() => throw UnsupportedError('Unsupported platform');
 
-    return safe(android: android, ios: ios, web: error, macos: error);
+    return safe(
+      android: android,
+      ios: ios,
+      web: error,
+      macos: error,
+      desktop: desktop ?? error,
+    );
   }
 }
