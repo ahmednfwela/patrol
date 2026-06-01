@@ -188,7 +188,17 @@ jobs:
           if [ "${{ inputs.verbose }}" = "true" ]; then
             ARGS="$ARGS --verbose"
           fi
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            ARGS="$ARGS --coverage"
+          fi
           patrol test $ARGS
+
+      - name: Upload coverage
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ios
+          path: ${{ inputs.working-directory }}/coverage/
 
       - name: Shutdown simulator
         if: always()
@@ -225,7 +235,17 @@ jobs:
           if [ "${{ inputs.verbose }}" = "true" ]; then
             ARGS="$ARGS --verbose"
           fi
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            ARGS="$ARGS --coverage"
+          fi
           patrol test $ARGS
+
+      - name: Upload coverage
+        if: inputs.coverage && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-macos
+          path: ${{ inputs.working-directory }}/coverage/
 
   test-web:
     needs: detect-platforms
@@ -307,17 +327,7 @@ jobs:
           if [ "${{ inputs.verbose }}" = "true" ]; then
             ARGS="$ARGS --verbose"
           fi
-          if [ "${{ inputs.coverage }}" = "true" ]; then
-            ARGS="$ARGS --coverage"
-          fi
           dbus-run-session -- xvfb-run -a patrol test $ARGS
-
-      - name: Upload coverage
-        if: inputs.coverage && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-linux
-          path: ${{ inputs.working-directory }}/coverage/
 
   test-windows:
     needs: detect-platforms
@@ -355,14 +365,4 @@ jobs:
           if ("${{ inputs.verbose }}" -eq "true") {
             $args += "--verbose"
           }
-          if ("${{ inputs.coverage }}" -eq "true") {
-            $args += "--coverage"
-          }
           patrol test @args
-
-      - name: Upload coverage
-        if: inputs.coverage && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-windows
-          path: ${{ inputs.working-directory }}/coverage/

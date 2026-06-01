@@ -79,8 +79,8 @@ class DeviceToHostPortTransformer
           TargetPlatform.windows:
         hostPort = devicePort;
       case TargetPlatform.web:
-        // TODO: Implement coverage for web
-        throw UnimplementedError('Web platform is not supported for coverage');
+        _logger.warn('Coverage is not yet supported for web platform');
+        hostPort = null;
     }
 
     if (hostPort == null) {
