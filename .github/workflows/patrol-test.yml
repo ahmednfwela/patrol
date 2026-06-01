@@ -275,7 +275,7 @@ jobs:
       - name: Run web tests
         working-directory: ${{ inputs.working-directory }}
         run: |
-          ARGS="-d chrome --web-headless true"
+          ARGS="-d chrome --web-headless true --web-locale en-US"
           if [ -n "${{ inputs.test-target }}" ]; then
             ARGS="$ARGS --target ${{ inputs.test-target }}"
           fi
