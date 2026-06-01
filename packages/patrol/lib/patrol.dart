@@ -21,18 +21,14 @@ export 'src/platform/contracts/contracts.dart'
         IOSElementType,
         IOSGetNativeViewsResponse,
         IOSNativeView,
-<<<<<<< HEAD
         KeyboardBehavior,
         Notification,
         Point2D,
         Rectangle;
+export 'src/platform/desktop/desktop_automator.dart';
 export 'src/platform/ios/ios_automator.dart';
 export 'src/platform/ios/ios_automator_config.dart';
 export 'src/platform/mobile/mobile_automator_config.dart';
-=======
-        KeyboardBehavior;
-export 'src/platform/desktop/desktop_automator.dart';
->>>>>>> master
 export 'src/platform/patrol_app_service.dart';
 export 'src/platform/platform_automator.dart';
 export 'src/platform/selector.dart';
