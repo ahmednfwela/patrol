@@ -28,4 +28,22 @@ void main() {
     );
   });
 
+  patrol('platform tap routing works', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    // Short timeout (2s) to avoid blocking the iOS main thread too long —
+    // IOSAutomator.waitFor runs on DispatchQueue.main.sync and a long
+    // blockage prevents XCTest from terminating the app between tests.
+    try {
+      await $.platform.tap(
+        Selector(text: 'NonExistentButton'),
+        timeout: const Duration(seconds: 2),
+      );
+      fail('Should have thrown - no such native element');
+    } on Exception catch (e) {
+      expect(e.toString(), isNot(contains('Unsupported platform')));
+      expect(e.toString(), isNot(contains('No desktop handler')));
+    }
+  });
 }
