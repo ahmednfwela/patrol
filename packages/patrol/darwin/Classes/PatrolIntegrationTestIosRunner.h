@@ -229,7 +229,11 @@
           NSLog(@"App uninstallation completed, launching fresh app instance");                                 \
         }                                                                                                       \
                                                                                                                 \
+        server.appReady = NO;                                                                                   \
         [[[XCUIApplication alloc] init] launch];                                                                \
+        while (!server.appReady) {                                                                              \
+          [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];                    \
+        }                                                                                                       \
         if (skip) {                                                                                             \
           XCTSkip(@"Skip that test \"%@\"", dartTestName);                                                      \
         }                                                                                                       \
