@@ -364,6 +364,8 @@ class MacOSAppOptions {
       '-quiet',
       ...['-derivedDataPath', '../build/macos_integ'],
       r'OTHER_SWIFT_FLAGS=$(inherited) -D PATROL_ENABLED',
+      'CODE_SIGNING_ALLOWED=NO',
+      'CODE_SIGN_IDENTITY=-',
     ];
 
     return cmd;

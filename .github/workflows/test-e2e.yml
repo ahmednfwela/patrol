@@ -29,8 +29,6 @@ concurrency:
 # The test bundle includes ALL files under the target directory. Web tests
 # import dart:ui_web which is unavailable on non-web platforms, so each
 # platform group must use a test-target that only includes compatible tests.
-#
-# macOS is skipped — xcodebuild requires code signing certs we don't have.
 
 jobs:
   e2e-desktop:
@@ -43,6 +41,19 @@ jobs:
         dart pub global activate melos &&
         melos bootstrap &&
         dart pub global activate --source path packages/patrol_cli
+      verbose: true
+
+  e2e-macos:
+    uses: ./.github/workflows/patrol-test.yml
+    with:
+      platforms: 'macos'
+      working-directory: 'dev/e2e_app'
+      test-target: 'patrol_test/macos/'
+      patrol-cli-setup: >-
+        dart pub global activate melos &&
+        melos bootstrap &&
+        dart pub global activate --source path packages/patrol_cli
+      coverage: true
       verbose: true
 
   e2e-web:
