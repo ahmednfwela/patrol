@@ -229,8 +229,13 @@
           NSLog(@"App uninstallation completed, launching fresh app instance");                                 \
         }                                                                                                       \
                                                                                                                 \
+        XCUIApplication *app = [[XCUIApplication alloc] init];                                                   \
+        if (app.state != XCUIApplicationStateNotRunning) {                                                      \
+          [app terminate];                                                                                      \
+          [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:3.0]];                    \
+        }                                                                                                       \
         server.appReady = NO;                                                                                   \
-        [[[XCUIApplication alloc] init] launch];                                                                \
+        [app launch];                                                                                           \
         while (!server.appReady) {                                                                              \
           [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];                    \
         }                                                                                                       \

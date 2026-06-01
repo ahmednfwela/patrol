@@ -78,8 +78,13 @@
       BOOL skip = [dartTest[@"skip"] boolValue];                                                            \
                                                                                                             \
       IMP implementation = imp_implementationWithBlock(^(id _self) {                                        \
+        XCUIApplication *app = [[XCUIApplication alloc] init];                                              \
+        if (app.state != XCUIApplicationStateNotRunning) {                                                  \
+          [app terminate];                                                                                  \
+          [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:3.0]];                \
+        }                                                                                                   \
         server.appReady = NO;                                                                               \
-        [[[XCUIApplication alloc] init] launch];                                                            \
+        [app launch];                                                                                       \
         while (!server.appReady) {                                                                          \
           [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];                \
         }                                                                                                   \
