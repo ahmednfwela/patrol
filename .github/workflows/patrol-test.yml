@@ -80,29 +80,18 @@ jobs:
     steps:
       - id: parse
         run: |
-          MATRIX=$(echo '${{ inputs.platforms }}' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' | jq -R . | jq -sc .)
+          RUNNERS='{"android":"ubuntu-latest","ios":"macos-latest","macos":"macos-latest","web":"ubuntu-latest","linux":"ubuntu-latest","windows":"windows-latest"}'
+          MATRIX=$(echo '${{ inputs.platforms }}' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' \
+            | jq -R --argjson runners "$RUNNERS" '{"platform":.,"runner":$runners[.]}' | jq -sc .)
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "Platforms: $MATRIX"
+          echo "Matrix: $MATRIX"
 
   test:
     needs: setup
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJson(needs.setup.outputs.matrix) }}
-        include:
-          - platform: android
-            runner: ubuntu-latest
-          - platform: ios
-            runner: macos-latest
-          - platform: macos
-            runner: macos-latest
-          - platform: web
-            runner: ubuntu-latest
-          - platform: linux
-            runner: ubuntu-latest
-          - platform: windows
-            runner: windows-latest
+        include: ${{ fromJson(needs.setup.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
