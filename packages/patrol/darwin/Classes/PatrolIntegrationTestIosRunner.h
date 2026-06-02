@@ -232,7 +232,14 @@
         XCUIApplication *app = [[XCUIApplication alloc] init];                                                   \
         if (app.state != XCUIApplicationStateNotRunning) {                                                      \
           [app terminate];                                                                                      \
-          [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:3.0]];                    \
+          NSTimeInterval deadline = [[NSDate date] timeIntervalSince1970] + 10.0;                               \
+          while (app.state != XCUIApplicationStateNotRunning) {                                                 \
+            if ([[NSDate date] timeIntervalSince1970] > deadline) {                                             \
+              NSLog(@"App did not terminate within 10s, force continuing");                                     \
+              break;                                                                                            \
+            }                                                                                                   \
+            [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.5]];                  \
+          }                                                                                                     \
         }                                                                                                       \
         server.appReady = NO;                                                                                   \
         [app launch];                                                                                           \
