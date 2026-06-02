@@ -218,10 +218,8 @@ class WebTestBackend {
       '-d',
       if (useChrome) 'chrome' else 'web-server',
       ...develop ? ['--verbose'] : [],
-      if (coverageEnabled && !develop) ...[
+      if (coverageEnabled && !develop)
         '--web-browser-flag=--headless=new',
-        '--web-browser-flag=--remote-debugging-port=9222',
-      ],
       if (options.webPort != null) '--web-port=${options.webPort}',
       '--target=${options.flutter.target}',
       '--${options.flutter.buildMode.name}',
