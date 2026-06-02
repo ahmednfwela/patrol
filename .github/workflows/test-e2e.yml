@@ -54,7 +54,6 @@ jobs:
         dart pub global activate melos &&
         melos bootstrap &&
         dart pub global activate --source path packages/patrol_cli
-      coverage: true
       verbose: true
 
   e2e-android:
