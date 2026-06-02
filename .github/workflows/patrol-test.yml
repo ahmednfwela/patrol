@@ -225,6 +225,9 @@ jobs:
           if [ "${{ inputs.verbose }}" = "true" ]; then
             ARGS="$ARGS --verbose"
           fi
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            ARGS="$ARGS --coverage"
+          fi
           patrol test $ARGS
 
       - name: Run Linux tests
