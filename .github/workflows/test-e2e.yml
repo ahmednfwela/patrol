@@ -77,6 +77,7 @@ jobs:
       platforms: 'ios'
       working-directory: 'dev/e2e_app'
       test-target: 'patrol_test/smoke/'
+      coverage: true
       patrol-cli-setup: >-
         dart pub global activate melos &&
         melos bootstrap &&
@@ -93,6 +94,7 @@ jobs:
         dart pub global activate melos &&
         melos bootstrap &&
         dart pub global activate --source path packages/patrol_cli
+      coverage: true
       verbose: true
 
   analyze-native:
