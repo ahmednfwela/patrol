@@ -28,6 +28,22 @@ void main() {
     );
   });
 
+  patrol('counter controls and list tile taps', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+    expect($(#counterText).text, '0');
+
+    await $(FloatingActionButton).tap();
+    await $(FloatingActionButton).tap();
+    expect($(#counterText).text, '2');
+
+    await $(#tile1).scrollTo().tap();
+    expect($(#counterText).text, '12');
+
+    await $(#tile2).scrollTo().tap();
+    expect($(#counterText).text, '2');
+  });
+
   patrol('platform tap routing works', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
