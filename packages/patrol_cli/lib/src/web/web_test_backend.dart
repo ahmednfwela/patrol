@@ -88,14 +88,15 @@ class WebTestBackend {
       String? debuggerPort;
 
       if (coverageEnabled) {
-        // Chrome mode with fixed CDP port for Playwright connection.
-        // Also captures VM service URI from stdout for CoverageTool.
-        debuggerPort = '9222';
-        _webDebuggerPort = 9222;
-        baseUrl = await _waitForWebServerWithVmCapture(
+        // Chrome mode with --verbose so CDP port appears in stdout.
+        // _waitForWebDebugger captures both the CDP port (for Playwright)
+        // and VM service URI (for CoverageTool via _vmConnectionController).
+        debuggerPort = await _waitForWebDebugger(
           flutterProcess,
           serverTimeout: options.serverTimeout,
         );
+        _webDebuggerPort = int.parse(debuggerPort);
+        baseUrl = 'http://localhost:${options.webPort ?? 0}';
       } else {
         baseUrl = await _waitForWebServer(
           flutterProcess,
@@ -217,7 +218,7 @@ class WebTestBackend {
       'run',
       '-d',
       if (useChrome) 'chrome' else 'web-server',
-      ...develop ? ['--verbose'] : [],
+      ...(develop || coverageEnabled) ? ['--verbose'] : [],
       if (coverageEnabled && !develop)
         '--web-browser-flag=--headless=new',
       if (options.webPort != null) '--web-port=${options.webPort}',
@@ -326,82 +327,6 @@ class WebTestBackend {
         stderrSubscription.cancel();
         completer.completeError(
           'Timeout waiting for web server to start '
-          '(after ${timeoutDuration.inSeconds}s). '
-          'Consider increasing the timeout with --web-server-timeout.',
-        );
-      }
-    });
-
-    return completer.future;
-  }
-
-  Future<String> _waitForWebServerWithVmCapture(
-    Process flutterProcess, {
-    int? serverTimeout,
-  }) {
-    final timeoutDuration = Duration(
-      seconds: serverTimeout ?? _kDefaultWebServerTimeoutSeconds,
-    );
-    _logger.detail(
-      'Waiting for Chrome+DWDS to start (timeout: ${timeoutDuration.inSeconds}s)...',
-    );
-
-    final completer = Completer<String>();
-    late StreamSubscription<String> stdoutSubscription;
-    late StreamSubscription<String> stderrSubscription;
-
-    stdoutSubscription = flutterProcess.stdout
-        .transform(const SystemEncoding().decoder)
-        .transform(const LineSplitter())
-        .listen((line) {
-          _logger.detail('Flutter: $line');
-
-          // Capture VM service URI — web format uses "is available at:"
-          final vmMatch = RegExp(
-            r'(?:listening on|is available at:)\s+(http://\S+)',
-          ).firstMatch(line);
-          if (vmMatch != null) {
-            final uri = Uri.parse(vmMatch.group(1)!);
-            final auth = uri.pathSegments
-                .where((s) => s.isNotEmpty)
-                .lastOrNull ?? '';
-            if (auth.isNotEmpty) {
-              final details = VMConnectionDetails(
-                port: uri.port,
-                auth: auth,
-              );
-              _logger.info('Captured VM service URI: ${details.uri}');
-              _vmConnectionController.add(details);
-            }
-            if (!completer.isCompleted) {
-              completer.complete(vmMatch.group(1)!);
-            }
-          }
-        });
-
-    stderrSubscription = flutterProcess.stderr
-        .transform(const SystemEncoding().decoder)
-        .transform(const LineSplitter())
-        .listen((line) {
-          _logger.detail('Flutter stderr: $line');
-        });
-
-    flutterProcess.exitCode.then((exitCode) {
-      if (!completer.isCompleted && exitCode != 0) {
-        stdoutSubscription.cancel();
-        stderrSubscription.cancel();
-        completer.completeError(
-          'Flutter process exited unexpectedly with code $exitCode',
-        );
-      }
-    }).ignore();
-
-    Timer(timeoutDuration, () {
-      if (!completer.isCompleted) {
-        stdoutSubscription.cancel();
-        stderrSubscription.cancel();
-        completer.completeError(
-          'Timeout waiting for Chrome+DWDS to start '
           '(after ${timeoutDuration.inSeconds}s). '
           'Consider increasing the timeout with --web-server-timeout.',
         );
