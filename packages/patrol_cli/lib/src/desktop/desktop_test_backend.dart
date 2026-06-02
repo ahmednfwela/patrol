@@ -6,6 +6,7 @@ import 'package:dispose_scope/dispose_scope.dart';
 import 'package:patrol_cli/src/base/exceptions.dart';
 import 'package:patrol_cli/src/base/logger.dart';
 import 'package:patrol_cli/src/base/process.dart';
+import 'package:patrol_cli/src/coverage/vm_connection_details.dart';
 import 'package:patrol_cli/src/crossplatform/app_options.dart';
 import 'package:patrol_cli/src/devices.dart';
 import 'package:process/process.dart';
@@ -28,8 +29,13 @@ class DesktopTestBackend {
   final Logger _logger;
   final DisposeScope _disposeScope;
 
-  /// The VM service URI captured from the last launched app's stdout.
-  /// Available for coverage collection after the app starts.
+  final _vmConnectionController = StreamController<VMConnectionDetails>();
+
+  /// Stream of VM service connection details emitted on each app launch.
+  /// Used by [CoverageTool] for desktop coverage collection.
+  Stream<VMConnectionDetails> get vmConnectionStream =>
+      _vmConnectionController.stream;
+
   Uri? _lastVmServiceUri;
 
   Future<void> build(DesktopAppOptions options) async {
@@ -83,7 +89,7 @@ class DesktopTestBackend {
     final baseUri = Uri.parse('http://localhost:$port');
 
     try {
-      // Discovery pass: launch app, list tests, run first test
+      // Discovery pass: launch app, list tests, then kill (no test runs here)
       final testNames = <String>[];
       var passCount = 0;
       var failCount = 0;
@@ -107,25 +113,13 @@ class DesktopTestBackend {
           for (final name in testNames) {
             _logger.detail('  - $name');
           }
-
-          // Run the first test in this same session
-          final result = await _runDartTest(baseUri, testNames.first);
-          _logTestResult(testNames.first, result);
-          switch (result) {
-            case 'success':
-              passCount++;
-            case 'skipped':
-              skipCount++;
-            default:
-              failCount++;
-          }
         } finally {
           await _killProcess(appProcess);
         }
       }
 
-      // Run remaining tests, each in a fresh app launch
-      for (var i = 1; i < testNames.length; i++) {
+      // Run each test in a fresh app launch
+      for (var i = 0; i < testNames.length; i++) {
         final testName = testNames[i];
         final appProcess = await _launchApp(options);
         try {
@@ -162,6 +156,8 @@ class DesktopTestBackend {
       }
       task.fail('Failed to execute tests of $subject ($e)');
       rethrow;
+    } finally {
+      await _vmConnectionController.close();
     }
   }
 
@@ -187,6 +183,10 @@ class DesktopTestBackend {
             if (match != null) {
               _lastVmServiceUri = Uri.parse(match.group(1)!);
               _logger.detail('Captured VM service URI: $_lastVmServiceUri');
+              final details = VMConnectionDetails.tryExtractFromLogs(l);
+              if (details != null) {
+                _vmConnectionController.add(details);
+              }
             }
           }
         })

@@ -55,6 +55,7 @@ class CoverageTool {
     required Set<Glob> ignoreGlobs,
     required FlutterCommand flutterCommand,
     bool includeWorkspacePackages = false,
+    Stream<VMConnectionDetails>? vmConnectionStream,
   }) async {
     final homeDirectory =
         _platform.environment['HOME'] ?? _platform.environment['USERPROFILE'];
@@ -68,35 +69,41 @@ class CoverageTool {
     );
 
     await _disposeScope.run((scope) async {
-      final logsProcess =
-          await _processManager.start(
-              [
-                flutterCommand.executable,
-                ...flutterCommand.arguments,
-                'logs',
-                '-d',
-                device.id,
-              ],
-              workingDirectory: homeDirectory,
-              runInShell: true,
-            )
-            ..disposedBy(scope);
+      final Stream<VMConnectionDetails> vmConnectionDetailsStream;
 
-      final vmConnectionDetailsStream = logsProcess.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .map(VMConnectionDetails.tryExtractFromLogs)
-          .where((details) => details != null)
-          .cast<VMConnectionDetails>()
-          .transform(
-            DeviceToHostPortTransformer(
-              device: device,
-              devicePlatform: platform,
-              adb: _adb,
-              logger: logger,
-            ),
-          )
-          .asBroadcastStream();
+      if (vmConnectionStream != null) {
+        vmConnectionDetailsStream = vmConnectionStream.asBroadcastStream();
+      } else {
+        final logsProcess =
+            await _processManager.start(
+                [
+                  flutterCommand.executable,
+                  ...flutterCommand.arguments,
+                  'logs',
+                  '-d',
+                  device.id,
+                ],
+                workingDirectory: homeDirectory,
+                runInShell: true,
+              )
+              ..disposedBy(scope);
+
+        vmConnectionDetailsStream = logsProcess.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .map(VMConnectionDetails.tryExtractFromLogs)
+            .where((details) => details != null)
+            .cast<VMConnectionDetails>()
+            .transform(
+              DeviceToHostPortTransformer(
+                device: device,
+                devicePlatform: platform,
+                adb: _adb,
+                logger: logger,
+              ),
+            )
+            .asBroadcastStream();
+      }
 
       final totalTestCount = await vmConnectionDetailsStream
           .asyncMap(_collectTotalTestCount)

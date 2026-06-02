@@ -239,6 +239,9 @@ jobs:
           if [ "${{ inputs.verbose }}" = "true" ]; then
             ARGS="$ARGS --verbose"
           fi
+          if [ "${{ inputs.coverage }}" = "true" ]; then
+            ARGS="$ARGS --coverage"
+          fi
           dbus-run-session -- xvfb-run -a patrol test $ARGS
 
       - name: Run Windows tests
@@ -253,6 +256,9 @@ jobs:
           }
           if ("${{ inputs.verbose }}" -eq "true") {
             $args += "--verbose"
+          }
+          if ("${{ inputs.coverage }}" -eq "true") {
+            $args += "--coverage"
           }
           patrol test @args
 

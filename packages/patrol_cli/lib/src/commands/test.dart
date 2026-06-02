@@ -360,6 +360,9 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
     await _preExecute(androidOpts, iosOpts, macosOpts, device, uninstall);
 
     if (coverageEnabled) {
+      final isDesktop = device.targetPlatform == TargetPlatform.linux ||
+          device.targetPlatform == TargetPlatform.windows;
+
       unawaited(
         _coverageTool.run(
           device: device,
@@ -368,6 +371,8 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
           ignoreGlobs: ignoreGlobs,
           flutterCommand: flutterCommand,
           includeWorkspacePackages: coverageWorkspace,
+          vmConnectionStream:
+              isDesktop ? _desktopTestBackend.vmConnectionStream : null,
           packagesRegExps: switch ((
             coveragePackagesRegExps.length,
             coverageWorkspace,
