@@ -43,6 +43,8 @@ class WebTestBackend {
   Stream<VMConnectionDetails> get vmConnectionStream =>
       _vmConnectionController.stream;
 
+  String? _capturedBaseUrl;
+
   Future<void> build(WebAppOptions options) async {
     _logger.detail('Building web app for testing...');
 
@@ -96,7 +98,7 @@ class WebTestBackend {
           serverTimeout: options.serverTimeout,
         );
         _webDebuggerPort = int.parse(debuggerPort);
-        baseUrl = 'http://localhost:${options.webPort ?? 0}';
+        baseUrl = _capturedBaseUrl ?? 'http://localhost:${options.webPort ?? 8080}';
       } else {
         baseUrl = await _waitForWebServer(
           flutterProcess,
@@ -377,6 +379,16 @@ class WebTestBackend {
           if (vmDetails != null) {
             _logger.detail('Captured VM service URI from web debugger');
             _vmConnectionController.add(vmDetails);
+          }
+
+          // Capture app base URL from verbose output:
+          // "Launching Chromium (url = http://localhost:43185, ...)"
+          final baseUrlMatch = RegExp(
+            r'url = (http://[^,\s]+)',
+          ).firstMatch(line);
+          if (baseUrlMatch != null && _capturedBaseUrl == null) {
+            _capturedBaseUrl = baseUrlMatch.group(1)!;
+            _logger.detail('Captured base URL: $_capturedBaseUrl');
           }
 
           // [CHROME]: DevTools listening on ws://127.0.0.1:38861/devtools/browser/...
