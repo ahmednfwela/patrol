@@ -44,6 +44,8 @@ jobs:
       coverage: true
       verbose: true
 
+  # Web coverage: DWDS does not support getSourceReport with Coverage kind
+  # (error -32602). Needs V8 JS coverage + source map mapping instead.
   e2e-web:
     uses: ./.github/workflows/patrol-test.yml
     with:
@@ -54,7 +56,6 @@ jobs:
         dart pub global activate melos &&
         melos bootstrap &&
         dart pub global activate --source path packages/patrol_cli
-      coverage: true
       verbose: true
 
   e2e-android:
