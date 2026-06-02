@@ -55,14 +55,15 @@ void main() {
     await $.waitUntilVisible($(#counterText));
   }, tags: ['desktop']);
 
-  patrol('finder chaining with at()', ($) async {
+  patrol('finder evaluates visible widgets', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
-    final textButtons = $('Open scrolling screen')
-        .evaluate()
-        .toList();
-    expect(textButtons, isNotEmpty);
+    final counters = $(#counterText).evaluate().toList();
+    expect(counters, isNotEmpty);
+
+    final fabs = $(FloatingActionButton).evaluate().toList();
+    expect(fabs, isNotEmpty);
   }, tags: ['desktop']);
 
   patrol('waitUntilVisible succeeds for visible widget', ($) async {
