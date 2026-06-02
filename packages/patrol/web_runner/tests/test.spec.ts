@@ -23,6 +23,29 @@ export const patrolTest = base.extend({
       cdpBrowser = await chromium.connectOverCDP(`http://localhost:${debuggerPort}`)
       const context = cdpBrowser.contexts()[0]
       page = context.pages()[0] ?? await context.newPage()
+
+      // The app is already running and initialized in Flutter's Chrome.
+      // Only add console/error listeners — skip init scripts, handler
+      // exposure, and navigation since they conflict with the live app.
+      page.on("console", message => {
+        const text = message.text()
+        if (text.startsWith("PATROL_LOG")) {
+          // eslint-disable-next-line no-console
+          console.log(text)
+          return
+        }
+        // eslint-disable-next-line no-console
+        console.log(`Playwright: ${text}`)
+      })
+
+      page.on("pageerror", error => {
+        error.message = `Page error during test: ${error.message}`
+        // eslint-disable-next-line no-console
+        console.error(error.stack ?? error.message)
+      })
+
+      await use(page)
+      return
     }
 
     page.on("console", message => {
@@ -53,10 +76,8 @@ export const patrolTest = base.extend({
 
     await exposePatrolPlatformHandler(page)
 
-    if (!debuggerPort) {
-      // Standard mode: navigate to the web-server URL
-      await page.goto("/", { waitUntil: "domcontentloaded" })
-    }
+    // Standard mode: navigate to the web-server URL
+    await page.goto("/", { waitUntil: "domcontentloaded" })
 
     // Inject immediately upon load just to ensure tests have it right now
     await page.evaluate(() => {
