@@ -44,6 +44,9 @@ void main() {
     await $.waitUntilVisible($(#topText));
     await $.scrollUntilVisible(finder: $(#bottomText));
     await $.tap($(#backButton));
-    await $.waitUntilVisible($(#counterText));
+    await $.scrollUntilVisible(
+      finder: $(#counterText),
+      scrollDirection: AxisDirection.up,
+    );
   }, tags: ['macos']);
 }
