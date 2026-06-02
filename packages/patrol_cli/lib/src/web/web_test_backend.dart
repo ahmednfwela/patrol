@@ -357,8 +357,23 @@ class WebTestBackend {
         .listen((line) {
           _logger.detail('Flutter: $line');
 
-          // Capture VM service URI for coverage collection
-          final vmDetails = VMConnectionDetails.tryExtractFromLogs(line);
+          // Capture VM service URI for coverage collection.
+          // Web uses "is available at:" format, not "listening on".
+          var vmDetails = VMConnectionDetails.tryExtractFromLogs(line);
+          if (vmDetails == null) {
+            final vmMatch = RegExp(
+              r'is available at:\s+(http://\S+)',
+            ).firstMatch(line);
+            if (vmMatch != null) {
+              final uri = Uri.parse(vmMatch.group(1)!);
+              final auth = uri.pathSegments
+                  .where((s) => s.isNotEmpty)
+                  .lastOrNull ?? '';
+              if (auth.isNotEmpty) {
+                vmDetails = VMConnectionDetails(port: uri.port, auth: auth);
+              }
+            }
+          }
           if (vmDetails != null) {
             _logger.detail('Captured VM service URI from web debugger');
             _vmConnectionController.add(vmDetails);
