@@ -88,4 +88,17 @@ void main() {
     expect($(FloatingActionButton).evaluate(), isNotEmpty);
     expect($(#textField).evaluate(), isNotEmpty);
   });
+
+  patrol('multiple rapid taps and state verification', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    for (var i = 0; i < 5; i++) {
+      await $(FloatingActionButton).tap();
+    }
+    expect($(#counterText).text, '5');
+
+    await $(#tile2).scrollTo().tap();
+    expect($(#counterText).text, '-5');
+  });
 }
