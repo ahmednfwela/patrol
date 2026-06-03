@@ -239,7 +239,9 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
         'PATROL_TEST_SERVER_PORT': super.testServerPort.toString(),
         'PATROL_APP_SERVER_PORT': super.appServerPort.toString(),
       },
-      'COVERAGE_ENABLED': coverageEnabled.toString(),
+      // Web uses V8 JS coverage from Playwright — no Dart-side blocking needed.
+      if (device.targetPlatform != TargetPlatform.web)
+        'COVERAGE_ENABLED': coverageEnabled.toString(),
     }.withNullsRemoved();
 
     final dartDefines = {...customDartDefines, ...internalDartDefines};

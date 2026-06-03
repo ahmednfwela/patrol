@@ -200,7 +200,22 @@ class IOSTestBackend {
 
       final patrolLogReader =
           PatrolLogReader(
-              listenStdOut: processLogs.listenStdOut,
+              listenStdOut: (onData, {onError, onDone, cancelOnError}) {
+                return processLogs.listenStdOut(
+                  (line) {
+                    onData(line);
+                    final vmDetails =
+                        VMConnectionDetails.tryExtractFromLogs(line);
+                    if (vmDetails != null) {
+                      _logger.detail('Captured VM service URI from syslog');
+                      _vmConnectionController.add(vmDetails);
+                    }
+                  },
+                  onError: onError,
+                  onDone: onDone,
+                  cancelOnError: cancelOnError,
+                );
+              },
               scope: scope,
               log: _logger.info,
               reportPath: reportPath,
@@ -237,14 +252,7 @@ class IOSTestBackend {
               workingDirectory: _rootDirectory.childDirectory('ios').path,
             )
             ..disposedBy(_disposeScope);
-      process.listenStdOut((l) {
-        _logger.detail('\t$l');
-        final vmDetails = VMConnectionDetails.tryExtractFromLogs(l);
-        if (vmDetails != null) {
-          _logger.detail('Captured VM service URI from xcodebuild');
-          _vmConnectionController.add(vmDetails);
-        }
-      }).disposedBy(scope);
+      process.listenStdOut((l) => _logger.detail('\t$l')).disposedBy(scope);
       process.listenStdErr((l) => _logger.detail('\t$l')).disposedBy(scope);
 
       final exitCode = await process.exitCode;
