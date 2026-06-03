@@ -180,7 +180,7 @@ jobs:
             -d emulator-5554
             ${{ inputs.test-target != '' && format('--target {0}', inputs.test-target) || '' }}
             ${{ inputs.verbose && '--verbose' || '' }}
-            ${{ inputs.coverage && '--coverage --coverage-workspace' || '' }}
+            ${{ inputs.coverage && '--coverage --coverage-package patrol --coverage-package patrol_finders' || '' }}
 
       - name: Run iOS tests
         if: matrix.platform == 'ios'
@@ -194,7 +194,7 @@ jobs:
             ARGS="$ARGS --verbose"
           fi
           if [ "${{ inputs.coverage }}" = "true" ]; then
-            ARGS="$ARGS --coverage --coverage-workspace"
+            ARGS="$ARGS --coverage --coverage-package patrol --coverage-package patrol_finders"
           fi
           patrol test $ARGS
 
@@ -210,7 +210,7 @@ jobs:
             ARGS="$ARGS --verbose"
           fi
           if [ "${{ inputs.coverage }}" = "true" ]; then
-            ARGS="$ARGS --coverage --coverage-workspace"
+            ARGS="$ARGS --coverage --coverage-package patrol --coverage-package patrol_finders"
           fi
           patrol test $ARGS
 
@@ -226,7 +226,7 @@ jobs:
             ARGS="$ARGS --verbose"
           fi
           if [ "${{ inputs.coverage }}" = "true" ]; then
-            ARGS="$ARGS --coverage --coverage-workspace"
+            ARGS="$ARGS --coverage --coverage-package patrol --coverage-package patrol_finders"
           fi
           patrol test $ARGS
 
@@ -243,7 +243,7 @@ jobs:
             ARGS="$ARGS --verbose"
           fi
           if [ "${{ inputs.coverage }}" = "true" ]; then
-            ARGS="$ARGS --coverage --coverage-workspace"
+            ARGS="$ARGS --coverage --coverage-package patrol --coverage-package patrol_finders"
           fi
           dbus-run-session -- xvfb-run -a patrol test $ARGS
 
@@ -261,7 +261,7 @@ jobs:
             $args += "--verbose"
           }
           if ("${{ inputs.coverage }}" -eq "true") {
-            $args += @("--coverage", "--coverage-workspace")
+            $args += @("--coverage", "--coverage-package", "patrol", "--coverage-package", "patrol_finders")
           }
           patrol test @args
 
