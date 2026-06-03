@@ -362,36 +362,39 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
     await _preExecute(androidOpts, iosOpts, macosOpts, device, uninstall);
 
     if (coverageEnabled) {
+      // Web uses V8 JS coverage from Playwright — skip Dart-side CoverageTool.
+      final isWeb = device.targetPlatform == TargetPlatform.web;
       final vmStream = switch (device.targetPlatform) {
         TargetPlatform.linux || TargetPlatform.windows =>
           _desktopTestBackend.vmConnectionStream,
-        TargetPlatform.web => _webTestBackend.vmConnectionStream,
         TargetPlatform.iOS => _iosTestBackend.vmConnectionStream,
         _ => null,
       };
 
-      unawaited(
-        _coverageTool.run(
-          device: device,
-          platform: device.targetPlatform,
-          logger: _logger,
-          ignoreGlobs: ignoreGlobs,
-          flutterCommand: flutterCommand,
-          includeWorkspacePackages: coverageWorkspace,
-          vmConnectionStream: vmStream,
-          packagesRegExps: switch ((
-            coveragePackagesRegExps.length,
-            coverageWorkspace,
-          )) {
-            // No --coverage-package and no --coverage-workspace: fall back to
-            // the current package only.
-            (0, false) => {RegExp(config.flutterPackageName)},
-            // --coverage-workspace alone: rely entirely on workspace members.
-            (0, true) => const <RegExp>{},
-            _ => coveragePackagesRegExps.map(RegExp.new).toSet(),
-          },
-        ),
-      );
+      if (!isWeb) {
+        unawaited(
+          _coverageTool.run(
+            device: device,
+            platform: device.targetPlatform,
+            logger: _logger,
+            ignoreGlobs: ignoreGlobs,
+            flutterCommand: flutterCommand,
+            includeWorkspacePackages: coverageWorkspace,
+            vmConnectionStream: vmStream,
+            packagesRegExps: switch ((
+              coveragePackagesRegExps.length,
+              coverageWorkspace,
+            )) {
+              // No --coverage-package and no --coverage-workspace: fall back to
+              // the current package only.
+              (0, false) => {RegExp(config.flutterPackageName)},
+              // --coverage-workspace alone: rely entirely on workspace members.
+              (0, true) => const <RegExp>{},
+              _ => coveragePackagesRegExps.map(RegExp.new).toSet(),
+            },
+          ),
+        );
+      }
     }
 
     final allPassed = await _execute(
