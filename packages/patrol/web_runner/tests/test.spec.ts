@@ -3,7 +3,8 @@ import { initialise } from "./initialise"
 import { logger } from "./logger"
 import { exposePatrolPlatformHandler } from "./patrolPlatformHandler"
 import { PatrolTestEntry } from "./types"
-import type { CoverageEntry } from "playwright"
+import * as fs from "fs"
+import * as path from "path"
 
 const tests: PatrolTestEntry[] = process.env.PATROL_TESTS ? JSON.parse(process.env.PATROL_TESTS) : []
 if (tests.length === 0) {
@@ -12,7 +13,19 @@ if (tests.length === 0) {
 
 const debuggerPort = process.env.PATROL_DEBUGGER_PORT
 const collectCoverage = !!process.env.PATROL_WEB_COVERAGE
-const allCoverageEntries: CoverageEntry[] = []
+const coverageDir = process.env.PATROL_WEB_COVERAGE_DIR || "coverage"
+let coverageFileIndex = 0
+
+function saveCoverageEntries(entries: unknown[]) {
+  try {
+    if (!fs.existsSync(coverageDir)) fs.mkdirSync(coverageDir, { recursive: true })
+    const filePath = path.join(coverageDir, `v8-coverage-${coverageFileIndex++}.json`)
+    fs.writeFileSync(filePath, JSON.stringify(entries))
+    logger.info("Saved %d V8 coverage entries to %s", entries.length, filePath)
+  } catch (err) {
+    logger.warn("Failed to save V8 coverage: %s", err)
+  }
+}
 
 export const patrolTest = base.extend({
   page: async ({ page: defaultPage }, use) => {
@@ -54,7 +67,7 @@ export const patrolTest = base.extend({
       await use(page)
       if (collectCoverage) {
         const entries = await page.coverage.stopJSCoverage()
-        allCoverageEntries.push(...entries)
+        saveCoverageEntries(entries)
       }
       return
     }
@@ -101,7 +114,7 @@ export const patrolTest = base.extend({
     await use(page)
     if (collectCoverage) {
       const entries = await page.coverage.stopJSCoverage()
-      allCoverageEntries.push(...entries)
+      saveCoverageEntries(entries)
     }
   },
 })
@@ -126,19 +139,3 @@ for (const { name, skip, tags } of tests) {
   })
 }
 
-if (collectCoverage) {
-  patrolTest.afterAll(async () => {
-    if (allCoverageEntries.length === 0) {
-      logger.info("No V8 coverage entries collected")
-      return
-    }
-
-    try {
-      logger.info("Processing %d V8 coverage entries...", allCoverageEntries.length)
-      const { processV8Coverage } = await import("./v8-coverage")
-      await processV8Coverage(allCoverageEntries)
-    } catch (err) {
-      logger.warn("V8 coverage processing failed (non-fatal): %s", err)
-    }
-  })
-}

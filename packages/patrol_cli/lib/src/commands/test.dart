@@ -373,26 +373,28 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
 
       if (!isWeb) {
         unawaited(
-          _coverageTool.run(
-            device: device,
-            platform: device.targetPlatform,
-            logger: _logger,
-            ignoreGlobs: ignoreGlobs,
-            flutterCommand: flutterCommand,
-            includeWorkspacePackages: coverageWorkspace,
-            vmConnectionStream: vmStream,
-            packagesRegExps: switch ((
-              coveragePackagesRegExps.length,
-              coverageWorkspace,
-            )) {
-              // No --coverage-package and no --coverage-workspace: fall back to
-              // the current package only.
-              (0, false) => {RegExp(config.flutterPackageName)},
-              // --coverage-workspace alone: rely entirely on workspace members.
-              (0, true) => const <RegExp>{},
-              _ => coveragePackagesRegExps.map(RegExp.new).toSet(),
-            },
-          ),
+          _coverageTool
+              .run(
+                device: device,
+                platform: device.targetPlatform,
+                logger: _logger,
+                ignoreGlobs: ignoreGlobs,
+                flutterCommand: flutterCommand,
+                includeWorkspacePackages: coverageWorkspace,
+                vmConnectionStream: vmStream,
+                packagesRegExps: switch ((
+                  coveragePackagesRegExps.length,
+                  coverageWorkspace,
+                )) {
+                  (0, false) => {RegExp(config.flutterPackageName)},
+                  (0, true) => const <RegExp>{},
+                  _ => coveragePackagesRegExps.map(RegExp.new).toSet(),
+                },
+              )
+              .catchError(
+                (Object e) =>
+                    _logger.warn('Coverage collection failed: $e'),
+              ),
         );
       }
     }
