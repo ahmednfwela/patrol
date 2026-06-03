@@ -71,15 +71,13 @@ jobs:
       coverage: true
       verbose: true
 
-  # iOS coverage disabled: 30s timeout per test + termination overhead
-  # makes 5-test runs exceed XCTest limits. Re-enable once CoverageTool
-  # can connect via flutter logs on iOS (avoiding the 30s fallback).
   e2e-ios:
     uses: ./.github/workflows/patrol-test.yml
     with:
       platforms: 'ios'
       working-directory: 'dev/e2e_app'
       test-target: 'patrol_test/smoke/'
+      coverage: true
       patrol-cli-setup: >-
         dart pub global activate melos &&
         melos bootstrap &&

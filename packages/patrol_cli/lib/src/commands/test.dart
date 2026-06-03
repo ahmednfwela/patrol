@@ -360,9 +360,13 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
     await _preExecute(androidOpts, iosOpts, macosOpts, device, uninstall);
 
     if (coverageEnabled) {
-      final isDesktop = device.targetPlatform == TargetPlatform.linux ||
-          device.targetPlatform == TargetPlatform.windows;
-      final isWeb = device.targetPlatform == TargetPlatform.web;
+      final vmStream = switch (device.targetPlatform) {
+        TargetPlatform.linux || TargetPlatform.windows =>
+          _desktopTestBackend.vmConnectionStream,
+        TargetPlatform.web => _webTestBackend.vmConnectionStream,
+        TargetPlatform.iOS => _iosTestBackend.vmConnectionStream,
+        _ => null,
+      };
 
       unawaited(
         _coverageTool.run(
@@ -372,11 +376,7 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
           ignoreGlobs: ignoreGlobs,
           flutterCommand: flutterCommand,
           includeWorkspacePackages: coverageWorkspace,
-          vmConnectionStream: isDesktop
-              ? _desktopTestBackend.vmConnectionStream
-              : isWeb
-                  ? _webTestBackend.vmConnectionStream
-                  : null,
+          vmConnectionStream: vmStream,
           packagesRegExps: switch ((
             coveragePackagesRegExps.length,
             coverageWorkspace,
