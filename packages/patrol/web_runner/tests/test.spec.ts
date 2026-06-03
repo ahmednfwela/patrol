@@ -135,7 +135,8 @@ for (const { name, skip, tags } of tests) {
 
     // Close the page *after* retrieving the result to ensure it gets fully torn
     // down before the next test spins up a new page context.
-    await page.close()
+    // Skip when collecting coverage — stopJSCoverage runs in fixture teardown.
+    if (!collectCoverage) await page.close()
   })
 }
 

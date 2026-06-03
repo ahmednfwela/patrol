@@ -93,10 +93,10 @@ class PatrolBinding extends LiveTestWidgetsFlutterBinding {
             });
 
             await testCompleter.future.timeout(
-              const Duration(seconds: 30),
+              const Duration(seconds: 5),
               onTimeout: () {
                 logger(
-                  'Coverage collection timed out after 30s — '
+                  'Coverage collection timed out after 5s — '
                   'CoverageTool may not be connected. Proceeding.',
                 );
               },
