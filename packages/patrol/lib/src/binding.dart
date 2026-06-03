@@ -77,29 +77,33 @@ class PatrolBinding extends LiveTestWidgetsFlutterBinding {
 
       if (nameOfRequestedTest == _currentDartTest) {
         if (const bool.fromEnvironment('COVERAGE_ENABLED')) {
-          postEvent('waitForCoverageCollection', {
-            'mainIsolateId': Service.getIsolateId(Isolate.current),
-          });
+          try {
+            postEvent('waitForCoverageCollection', {
+              'mainIsolateId': Service.getIsolateId(Isolate.current),
+            });
 
-          final testCompleter = Completer<void>();
+            final testCompleter = Completer<void>();
 
-          registerExtension('ext.patrol.markTestCompleted', (
-            method,
-            parameters,
-          ) async {
-            testCompleter.complete();
-            return ServiceExtensionResponse.result(jsonEncode({}));
-          });
+            registerExtension('ext.patrol.markTestCompleted', (
+              method,
+              parameters,
+            ) async {
+              testCompleter.complete();
+              return ServiceExtensionResponse.result(jsonEncode({}));
+            });
 
-          await testCompleter.future.timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              logger(
-                'Coverage collection timed out after 30s — '
-                'CoverageTool may not be connected. Proceeding.',
-              );
-            },
-          );
+            await testCompleter.future.timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                logger(
+                  'Coverage collection timed out after 30s — '
+                  'CoverageTool may not be connected. Proceeding.',
+                );
+              },
+            );
+          } catch (e) {
+            logger('Coverage protocol unavailable (web?): $e');
+          }
         }
 
         logger(

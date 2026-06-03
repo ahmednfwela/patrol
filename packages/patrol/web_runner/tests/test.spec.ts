@@ -3,6 +3,7 @@ import { initialise } from "./initialise"
 import { logger } from "./logger"
 import { exposePatrolPlatformHandler } from "./patrolPlatformHandler"
 import { PatrolTestEntry } from "./types"
+import type { CoverageEntry } from "playwright"
 
 const tests: PatrolTestEntry[] = process.env.PATROL_TESTS ? JSON.parse(process.env.PATROL_TESTS) : []
 if (tests.length === 0) {
@@ -10,6 +11,8 @@ if (tests.length === 0) {
 }
 
 const debuggerPort = process.env.PATROL_DEBUGGER_PORT
+const collectCoverage = !!process.env.PATROL_WEB_COVERAGE
+const allCoverageEntries: CoverageEntry[] = []
 
 export const patrolTest = base.extend({
   page: async ({ page: defaultPage }, use) => {
@@ -47,7 +50,12 @@ export const patrolTest = base.extend({
         console.error(error.stack ?? error.message)
       })
 
+      if (collectCoverage) await page.coverage.startJSCoverage()
       await use(page)
+      if (collectCoverage) {
+        const entries = await page.coverage.stopJSCoverage()
+        allCoverageEntries.push(...entries)
+      }
       return
     }
 
@@ -89,7 +97,12 @@ export const patrolTest = base.extend({
 
     await initialise(page)
 
+    if (collectCoverage) await page.coverage.startJSCoverage()
     await use(page)
+    if (collectCoverage) {
+      const entries = await page.coverage.stopJSCoverage()
+      allCoverageEntries.push(...entries)
+    }
   },
 })
 
@@ -110,5 +123,18 @@ for (const { name, skip, tags } of tests) {
     // Close the page *after* retrieving the result to ensure it gets fully torn
     // down before the next test spins up a new page context.
     await page.close()
+  })
+}
+
+if (collectCoverage) {
+  patrolTest.afterAll(async () => {
+    if (allCoverageEntries.length === 0) {
+      logger.info("No V8 coverage entries collected")
+      return
+    }
+
+    logger.info("Processing %d V8 coverage entries...", allCoverageEntries.length)
+    const { processV8Coverage } = await import("./v8-coverage")
+    await processV8Coverage(allCoverageEntries)
   })
 }

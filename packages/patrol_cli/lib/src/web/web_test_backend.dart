@@ -78,33 +78,19 @@ class WebTestBackend {
       ..detail('Starting web test execution...')
       ..info('Building Flutter web app...');
 
-    // Start Flutter web server (use chrome+DWDS when coverage enabled)
+    // V8 coverage is collected by Playwright directly — no chrome+DWDS needed.
+    // Standard web-server mode works fine; PATROL_WEB_COVERAGE env var tells
+    // Playwright to collect V8 JS coverage.
     final flutterProcess = await _startFlutterWebServer(
       options,
       develop: false,
-      coverageEnabled: coverageEnabled,
     );
 
     try {
-      String baseUrl;
-      String? debuggerPort;
-
-      if (coverageEnabled) {
-        // Chrome mode with --verbose so CDP port appears in stdout.
-        // _waitForWebDebugger captures both the CDP port (for Playwright)
-        // and VM service URI (for CoverageTool via _vmConnectionController).
-        debuggerPort = await _waitForWebDebugger(
-          flutterProcess,
-          serverTimeout: options.serverTimeout,
-        );
-        _webDebuggerPort = int.parse(debuggerPort);
-        baseUrl = _capturedBaseUrl ?? 'http://localhost:${options.webPort ?? 8080}';
-      } else {
-        baseUrl = await _waitForWebServer(
-          flutterProcess,
-          serverTimeout: options.serverTimeout,
-        );
-      }
+      final baseUrl = await _waitForWebServer(
+        flutterProcess,
+        serverTimeout: options.serverTimeout,
+      );
 
       // Run Playwright tests
       await _runPlaywrightTests(
@@ -113,7 +99,7 @@ class WebTestBackend {
         showFlutterLogs: showFlutterLogs,
         hideTestSteps: hideTestSteps,
         clearTestSteps: clearTestSteps,
-        debuggerPort: debuggerPort,
+        coverageEnabled: coverageEnabled,
       );
     } finally {
       // Clean up Flutter process gracefully
@@ -502,6 +488,7 @@ class WebTestBackend {
     required bool hideTestSteps,
     required bool clearTestSteps,
     String? debuggerPort,
+    bool coverageEnabled = false,
   }) async {
     _logger.info('Running Playwright tests against: $baseUrl');
     final completer = Completer<void>();
@@ -532,6 +519,8 @@ class WebTestBackend {
                 ...Platform.environment,
                 'BASE_URL': baseUrl,
                 'PATROL_DEBUGGER_PORT': ?debuggerPort,
+                if (coverageEnabled)
+                  'PATROL_WEB_COVERAGE': 'true',
                 'PATROL_TEST_RESULTS_DIR': testResultsDir,
                 'PATROL_TEST_REPORT_DIR': testReportDir,
                 if (options.retries != null)
