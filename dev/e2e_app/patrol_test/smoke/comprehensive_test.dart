@@ -61,14 +61,12 @@ void main() {
     expect($(#atFinderItem).evaluate().length, greaterThan(0));
   });
 
-  patrol('complex widget tree traversal', ($) async {
+  patrol('nested finder within scaffold', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
-    expect($(#box1).$(Text), findsWidgets);
-    expect($(#tile1).$(Text), findsOneWidget);
-    expect($(#tile2).$(Text), findsOneWidget);
-
     expect($(Scaffold).$(FloatingActionButton), findsOneWidget);
+    expect($(Scaffold).$(#counterText), findsOneWidget);
+    expect($(Scaffold).$(#textField), findsOneWidget);
   });
 }
