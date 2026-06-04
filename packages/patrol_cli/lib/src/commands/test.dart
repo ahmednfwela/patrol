@@ -363,6 +363,7 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
 
     await _preExecute(androidOpts, iosOpts, macosOpts, device, uninstall);
 
+    Future<void>? coverageFuture;
     if (coverageEnabled) {
       // Web uses V8 JS coverage from Playwright — skip Dart-side CoverageTool.
       final isWeb = device.targetPlatform == TargetPlatform.web;
@@ -371,37 +372,36 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
           _desktopTestBackend.vmConnectionStream,
         TargetPlatform.iOS => _iosTestBackend.vmConnectionStream,
         TargetPlatform.macOS => _macosTestBackend.vmConnectionStream,
-        TargetPlatform.android => _androidTestBackend.vmConnectionStream,
+        // Android uses flutter logs (null) so DeviceToHostPortTransformer
+        // handles adb port forwarding from emulator to host.
         _ => null,
       };
 
       final isIOS = device.targetPlatform == TargetPlatform.iOS;
       if (!isWeb) {
-        unawaited(
-          _coverageTool
-              .run(
-                proactive: isIOS,
-                device: device,
-                platform: device.targetPlatform,
-                logger: _logger,
-                ignoreGlobs: ignoreGlobs,
-                flutterCommand: flutterCommand,
-                includeWorkspacePackages: coverageWorkspace,
-                vmConnectionStream: vmStream,
-                packagesRegExps: switch ((
-                  coveragePackagesRegExps.length,
-                  coverageWorkspace,
-                )) {
-                  (0, false) => {RegExp(config.flutterPackageName)},
-                  (0, true) => const <RegExp>{},
-                  _ => coveragePackagesRegExps.map(RegExp.new).toSet(),
-                },
-              )
-              .catchError(
-                (Object e) =>
-                    _logger.warn('Coverage collection failed: $e'),
-              ),
-        );
+        coverageFuture = _coverageTool
+            .run(
+              proactive: isIOS,
+              device: device,
+              platform: device.targetPlatform,
+              logger: _logger,
+              ignoreGlobs: ignoreGlobs,
+              flutterCommand: flutterCommand,
+              includeWorkspacePackages: coverageWorkspace,
+              vmConnectionStream: vmStream,
+              packagesRegExps: switch ((
+                coveragePackagesRegExps.length,
+                coverageWorkspace,
+              )) {
+                (0, false) => {RegExp(config.flutterPackageName)},
+                (0, true) => const <RegExp>{},
+                _ => coveragePackagesRegExps.map(RegExp.new).toSet(),
+              },
+            )
+            .catchError(
+              (Object e) =>
+                  _logger.warn('Coverage collection failed: $e'),
+            );
       }
     }
 
@@ -419,6 +419,11 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
       hideTestSteps: boolArg('hide-test-steps'),
       clearTestSteps: boolArg('clear-test-steps'),
     );
+
+    if (coverageFuture != null) {
+      _logger.info('Waiting for coverage collection to finish...');
+      await coverageFuture;
+    }
 
     return allPassed ? 0 : 1;
   }

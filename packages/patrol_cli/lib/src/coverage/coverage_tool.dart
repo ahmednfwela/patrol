@@ -158,16 +158,21 @@ class CoverageTool {
         final coverageCollectionCompleter = Completer<void>()
           ..disposedBy(scope, null);
         vmConnectionDetailsStream
-            .asyncMap((details) {
+            .asyncMap((details) async {
               if (!skippedFirst) {
                 skippedFirst = true;
                 logger.detail('Skipping discovery VM URI');
-                return Future.value(<String, coverage.HitMap>{});
+                return <String, coverage.HitMap>{};
               }
-              return _collectFromVM(
-                packages: packages,
-                connectionDetails: details,
-              );
+              try {
+                return await _collectFromVM(
+                  packages: packages,
+                  connectionDetails: details,
+                );
+              } on Exception catch (e) {
+                logger.warn('Coverage collection failed: $e');
+                return <String, coverage.HitMap>{};
+              }
             })
             .listen((cov) {
               if (cov.isNotEmpty) {
