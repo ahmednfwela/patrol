@@ -9,6 +9,7 @@ import 'package:path/path.dart' show join;
 import 'package:patrol_cli/src/base/exceptions.dart';
 import 'package:patrol_cli/src/base/logger.dart';
 import 'package:patrol_cli/src/base/process.dart';
+import 'package:patrol_cli/src/coverage/vm_connection_details.dart';
 import 'package:patrol_cli/src/crossplatform/app_options.dart';
 import 'package:patrol_cli/src/devices.dart';
 import 'package:platform/platform.dart';
@@ -74,6 +75,11 @@ class MacOSTestBackend {
   final Directory _rootDirectory;
   final DisposeScope _disposeScope;
   final Logger _logger;
+
+  final _vmConnectionController = StreamController<VMConnectionDetails>();
+
+  Stream<VMConnectionDetails> get vmConnectionStream =>
+      _vmConnectionController.stream;
 
   Future<void> build(MacOSAppOptions options) async {
     await _disposeScope.run((scope) async {
@@ -176,10 +182,20 @@ class MacOSTestBackend {
               workingDirectory: _rootDirectory.childDirectory('macos').path,
             )
             ..disposedBy(_disposeScope);
-      process.listenStdOut((l) => _logger.detail('\t$l')).disposedBy(scope);
+      process
+          .listenStdOut((l) {
+            _logger.detail('\t$l');
+            final vmDetails = VMConnectionDetails.tryExtractFromLogs(l);
+            if (vmDetails != null) {
+              _logger.detail('Captured VM service URI from xcodebuild');
+              _vmConnectionController.add(vmDetails);
+            }
+          })
+          .disposedBy(scope);
       process.listenStdErr((l) => _logger.err('\t$l')).disposedBy(scope);
 
       final exitCode = await process.exitCode;
+      await _vmConnectionController.close();
 
       if (exitCode == 0) {
         task.complete('Completed executing $subject');

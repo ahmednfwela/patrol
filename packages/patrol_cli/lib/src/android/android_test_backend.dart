@@ -8,6 +8,7 @@ import 'package:patrol_cli/src/base/exceptions.dart';
 import 'package:patrol_cli/src/base/extensions/completer.dart';
 import 'package:patrol_cli/src/base/logger.dart';
 import 'package:patrol_cli/src/base/process.dart';
+import 'package:patrol_cli/src/coverage/vm_connection_details.dart';
 import 'package:patrol_cli/src/crossplatform/app_options.dart';
 import 'package:patrol_cli/src/devices.dart';
 import 'package:patrol_cli/src/ios/ios_test_backend.dart';
@@ -44,6 +45,11 @@ class AndroidTestBackend {
   final DisposeScope _disposeScope;
   final Logger _logger;
   late final String? javaPath;
+
+  final _vmConnectionController = StreamController<VMConnectionDetails>();
+
+  Stream<VMConnectionDetails> get vmConnectionStream =>
+      _vmConnectionController.stream;
 
   Future<void> build(AndroidAppOptions options) async {
     await buildApkConfigOnly(options.flutter);
@@ -272,7 +278,22 @@ class AndroidTestBackend {
 
       final patrolLogReader =
           PatrolLogReader(
-              listenStdOut: processLogcat.listenStdOut,
+              listenStdOut: (onData, {onError, onDone, cancelOnError}) {
+                return processLogcat.listenStdOut(
+                  (line) {
+                    onData(line);
+                    final vmDetails =
+                        VMConnectionDetails.tryExtractFromLogs(line);
+                    if (vmDetails != null) {
+                      _logger.detail('Captured VM service URI from logcat');
+                      _vmConnectionController.add(vmDetails);
+                    }
+                  },
+                  onError: onError,
+                  onDone: onDone,
+                  cancelOnError: cancelOnError,
+                );
+              },
               scope: scope,
               log: _logger.info,
               reportPath: reportPath,
@@ -314,6 +335,7 @@ class AndroidTestBackend {
           .disposedBy(scope);
 
       final exitCode = await process.exitCode;
+      await _vmConnectionController.close();
       patrolLogReader.stopTimer();
       processLogcat.kill();
 

@@ -239,11 +239,9 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
         'PATROL_TEST_SERVER_PORT': super.testServerPort.toString(),
         'PATROL_APP_SERVER_PORT': super.appServerPort.toString(),
       },
-      // Web uses V8 coverage from Playwright. iOS uses proactive collection.
-      // Both skip COVERAGE_ENABLED to avoid keeping the VM service alive.
-      if (device.targetPlatform != TargetPlatform.web &&
-          device.targetPlatform != TargetPlatform.iOS)
-        'COVERAGE_ENABLED': coverageEnabled.toString(),
+      // All platforms use proactive coverage collection, which doesn't need
+      // COVERAGE_ENABLED. Web uses V8 JS coverage from Playwright instead.
+
     }.withNullsRemoved();
 
     final dartDefines = {...customDartDefines, ...internalDartDefines};
@@ -370,15 +368,16 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
         TargetPlatform.linux || TargetPlatform.windows =>
           _desktopTestBackend.vmConnectionStream,
         TargetPlatform.iOS => _iosTestBackend.vmConnectionStream,
+        TargetPlatform.macOS => _macosTestBackend.vmConnectionStream,
+        TargetPlatform.android => _androidTestBackend.vmConnectionStream,
         _ => null,
       };
 
-      final isIOS = device.targetPlatform == TargetPlatform.iOS;
       if (!isWeb) {
         unawaited(
           _coverageTool
               .run(
-                proactive: isIOS,
+                proactive: true,
                 device: device,
                 platform: device.targetPlatform,
                 logger: _logger,
