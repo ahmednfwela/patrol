@@ -123,13 +123,17 @@ class CoverageTool {
                 return <String, coverage.HitMap>{};
               }
               try {
-                final data = await coverage.collect(
-                  details.uri,
-                  false,
-                  false,
-                  false,
-                  packages,
-                );
+                final data = await coverage
+                    .collect(details.uri, false, false, false, packages)
+                    .timeout(
+                      const Duration(seconds: 10),
+                      onTimeout: () {
+                        logger.warn(
+                          'Proactive coverage timed out for ${details.uri}',
+                        );
+                        return {'coverage': <Map<String, dynamic>>[]};
+                      },
+                    );
                 return coverage.HitMap.parseJson(
                   data['coverage'] as List<Map<String, dynamic>>,
                 );
