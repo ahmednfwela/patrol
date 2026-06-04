@@ -110,11 +110,18 @@ class CoverageTool {
         // Proactive mode: collect immediately from each VM URI without
         // waiting for extension events. Used on iOS where COVERAGE_ENABLED
         // is skipped to avoid keeping the VM service alive.
+        // Skip the first URI (discovery phase — no test runs, no coverage).
         var count = 0;
+        var skippedFirst = false;
         final coverageCollectionCompleter = Completer<void>()
           ..disposedBy(scope, null);
         vmConnectionDetailsStream
             .asyncMap((details) async {
+              if (!skippedFirst) {
+                skippedFirst = true;
+                logger.detail('Skipping discovery VM URI');
+                return <String, coverage.HitMap>{};
+              }
               try {
                 final data = await coverage.collect(
                   details.uri,

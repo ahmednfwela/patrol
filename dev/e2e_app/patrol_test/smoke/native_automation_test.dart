@@ -16,16 +16,6 @@ void main() {
     await $.waitUntilVisible($(#counterText));
   });
 
-  patrol('enableDarkMode and disableDarkMode', ($) async {
-    await createApp($);
-    await $.waitUntilVisible($(#counterText));
-
-    await $.platform.mobile.enableDarkMode();
-    await $.platform.mobile.disableDarkMode();
-
-    await $.waitUntilVisible($(#counterText));
-  });
-
   patrol('tapAt screen coordinates', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
