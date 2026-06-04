@@ -72,8 +72,17 @@ class CoverageTool {
     await _disposeScope.run((scope) async {
       final Stream<VMConnectionDetails> vmConnectionDetailsStream;
 
+      final portTransformer = DeviceToHostPortTransformer(
+        device: device,
+        devicePlatform: platform,
+        adb: _adb,
+        logger: logger,
+      );
+
       if (vmConnectionStream != null) {
-        vmConnectionDetailsStream = vmConnectionStream.asBroadcastStream();
+        vmConnectionDetailsStream = vmConnectionStream
+            .transform(portTransformer)
+            .asBroadcastStream();
       } else {
         final logsProcess =
             await _processManager.start(
@@ -95,14 +104,7 @@ class CoverageTool {
             .map(VMConnectionDetails.tryExtractFromLogs)
             .where((details) => details != null)
             .cast<VMConnectionDetails>()
-            .transform(
-              DeviceToHostPortTransformer(
-                device: device,
-                devicePlatform: platform,
-                adb: _adb,
-                logger: logger,
-              ),
-            )
+            .transform(portTransformer)
             .asBroadcastStream();
       }
 

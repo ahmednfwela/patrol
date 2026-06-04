@@ -157,6 +157,20 @@ class MacOSTestBackend {
       final subject = '${options.description} on ${device.description}';
       final task = _logger.task('Running $subject');
 
+      // Capture VM URIs from system log (xcodebuild stdout doesn't include them)
+      final syslogProcess =
+          await _processManager.start(['log', 'stream'], runInShell: true)
+            ..disposedBy(scope);
+      syslogProcess
+          .listenStdOut((line) {
+            final vmDetails = VMConnectionDetails.tryExtractFromLogs(line);
+            if (vmDetails != null) {
+              _logger.detail('Captured VM service URI from syslog');
+              _vmConnectionController.add(vmDetails);
+            }
+          })
+          .disposedBy(scope);
+
       final resultsPath = resultBundlePath(
         timestamp: DateTime.now().millisecondsSinceEpoch,
       );
@@ -182,20 +196,12 @@ class MacOSTestBackend {
               workingDirectory: _rootDirectory.childDirectory('macos').path,
             )
             ..disposedBy(_disposeScope);
-      process
-          .listenStdOut((l) {
-            _logger.detail('\t$l');
-            final vmDetails = VMConnectionDetails.tryExtractFromLogs(l);
-            if (vmDetails != null) {
-              _logger.detail('Captured VM service URI from xcodebuild');
-              _vmConnectionController.add(vmDetails);
-            }
-          })
-          .disposedBy(scope);
+      process.listenStdOut((l) => _logger.detail('\t$l')).disposedBy(scope);
       process.listenStdErr((l) => _logger.err('\t$l')).disposedBy(scope);
 
       final exitCode = await process.exitCode;
       await _vmConnectionController.close();
+      syslogProcess.kill();
 
       if (exitCode == 0) {
         task.complete('Completed executing $subject');

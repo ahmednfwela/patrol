@@ -372,8 +372,7 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
           _desktopTestBackend.vmConnectionStream,
         TargetPlatform.iOS => _iosTestBackend.vmConnectionStream,
         TargetPlatform.macOS => _macosTestBackend.vmConnectionStream,
-        // Android uses flutter logs (null) so DeviceToHostPortTransformer
-        // handles adb port forwarding from emulator to host.
+        TargetPlatform.android => _androidTestBackend.vmConnectionStream,
         _ => null,
       };
 
