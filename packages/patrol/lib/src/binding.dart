@@ -82,17 +82,25 @@ class PatrolBinding extends LiveTestWidgetsFlutterBinding {
               'mainIsolateId': Service.getIsolateId(Isolate.current),
             });
 
+            final testCompleter = Completer<void>();
+
             registerExtension('ext.patrol.markTestCompleted', (
               method,
               parameters,
             ) async {
+              testCompleter.complete();
               return ServiceExtensionResponse.result(jsonEncode({}));
             });
 
-            // Non-blocking: CoverageTool collects in background.
-            // XCUIApplication.terminate() only suspends the app (not kills),
-            // so the VM stays accessible for coverage collection even after
-            // the next test starts.
+            await testCompleter.future.timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                logger(
+                  'Coverage collection timed out after 30s — '
+                  'CoverageTool may not be connected. Proceeding.',
+                );
+              },
+            );
           } catch (e) {
             logger('Coverage protocol unavailable (web?): $e');
           }

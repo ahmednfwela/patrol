@@ -150,25 +150,30 @@ class CoverageTool {
           ..disposedBy(scope);
         await coverageCollectionCompleter.future;
       } else {
-        final totalTestCount = await vmConnectionDetailsStream
-            .asyncMap(_collectTotalTestCount)
-            .first;
-        logger.info('Total test count: $totalTestCount');
-
+        // Event-based mode: skip the first VM URI (test discovery phase) and
+        // collect coverage from each subsequent URI via waitForCoverageCollection
+        // events until the stream closes.
+        var skippedFirst = false;
         var count = 0;
         final coverageCollectionCompleter = Completer<void>()
           ..disposedBy(scope, null);
         vmConnectionDetailsStream
-            .take(totalTestCount)
-            .asyncMap(
-              (details) => _collectFromVM(
+            .asyncMap((details) {
+              if (!skippedFirst) {
+                skippedFirst = true;
+                logger.detail('Skipping discovery VM URI');
+                return Future.value(<String, coverage.HitMap>{});
+              }
+              return _collectFromVM(
                 packages: packages,
                 connectionDetails: details,
-              ),
-            )
+              );
+            })
             .listen((cov) {
-              hitMap.merge(cov);
-              logger.info('Collected ${++count} / $totalTestCount coverages');
+              if (cov.isNotEmpty) {
+                hitMap.merge(cov);
+                logger.info('Collected coverage ${++count}');
+              }
             })
           ..onDone(coverageCollectionCompleter.complete)
           ..disposedBy(scope);
@@ -182,30 +187,6 @@ class CoverageTool {
       );
       await _saveReport(report);
     });
-  }
-
-  Future<int> _collectTotalTestCount(
-    VMConnectionDetails connectionDetails,
-  ) async {
-    final serviceClient = await vmServiceConnectUri(
-      connectionDetails.webSocketUri.toString(),
-    );
-    _disposeScope.addDispose(serviceClient.dispose);
-
-    await serviceClient.streamListen('Extension');
-    final completer = Completer<int>()..disposedBy(_disposeScope, 0);
-    serviceClient.onExtensionEvent
-        .listen((event) {
-          if (event.extensionKind == 'testCount') {
-            completer.complete(event.extensionData!.data['testCount'] as int);
-          }
-        })
-        .disposedBy(_disposeScope);
-
-    final testCount = await completer.future;
-    await serviceClient.dispose();
-
-    return testCount;
   }
 
   Future<Map<String, coverage.HitMap>> _collectFromVM({
