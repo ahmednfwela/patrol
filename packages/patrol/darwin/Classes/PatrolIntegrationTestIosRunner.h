@@ -230,7 +230,12 @@
         }                                                                                                       \
                                                                                                                 \
         server.appReady = NO;                                                                                   \
-        [[[XCUIApplication alloc] init] launch];                                                                \
+        XCUIApplication *app = [[XCUIApplication alloc] init];                                                  \
+        if (app.state != XCUIApplicationStateNotRunning) {                                                      \
+          [app terminate];                                                                                      \
+          [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2.0]];                    \
+        }                                                                                                       \
+        [app launch];                                                                                           \
         while (!server.appReady) {                                                                              \
           [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];                    \
         }                                                                                                       \
