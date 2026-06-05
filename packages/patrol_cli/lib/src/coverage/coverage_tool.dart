@@ -234,11 +234,15 @@ class CoverageTool {
           .first
           .then(coverageReadyForCollection.complete),
     );
-    final event = await coverageReadyForCollection.future;
+    final event = await coverageReadyForCollection.future.timeout(
+      const Duration(seconds: 15),
+      onTimeout: () {
+        _logger.warn('Timed out waiting for waitForCoverageCollection event');
+        return null;
+      },
+    );
     if (event == null) {
-      // If the event is null, then the VM service terminated without sending
-      // the waitForCoverageCollection event. This means that the test was
-      // skipped, so we don't need to collect coverage.
+      await serviceClient.dispose();
       return {};
     }
 
