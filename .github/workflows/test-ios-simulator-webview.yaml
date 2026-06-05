@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -149,14 +149,14 @@ jobs:
 
       - name: Upload XCRESULT test result to artifacts
         if: ${{ (failure() || success()) && contains(fromJson('["success", "failure"]'), steps.tests_step.conclusion) }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Test result from ${{ matrix.device_model }}.xcresult
           path: ${{ env.XCRESULT_PATH }}
 
       - name: Upload simulator logs to artifacts
         if: ${{ (failure() || success()) && contains(fromJson('["success", "failure"]'), steps.tests_step.conclusion) }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Logs from ${{ matrix.device_model }}
           path: |
@@ -164,7 +164,7 @@ jobs:
 
       - name: Upload captured video to artifacts
         if: ${{ (failure() || success()) && contains(fromJson('["success", "failure"]'), steps.tests_step.conclusion) }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Captured video from ${{ matrix.device_model }}.mp4
           path: ${{ github.workspace }}/dev/e2e_app/${{ matrix.device_model }}.mp4

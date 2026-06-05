@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Add current platform to Gemfile
         working-directory: dev/e2e_app/ios

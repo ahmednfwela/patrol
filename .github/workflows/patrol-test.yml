@@ -95,7 +95,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # --- Platform-specific pre-setup ---
       - name: Install Linux build dependencies
@@ -268,7 +268,7 @@ jobs:
       # --- Coverage upload ---
       - name: Upload coverage
         if: inputs.coverage && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-${{ matrix.platform }}
           path: ${{ inputs.working-directory }}/coverage/

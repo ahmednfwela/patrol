@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: docs_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Copy docs into docs_app
         run: cp -r ../docs ./docs
