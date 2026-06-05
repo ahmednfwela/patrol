@@ -93,11 +93,16 @@ class PatrolBinding extends LiveTestWidgetsFlutterBinding {
               logger('VM service info file write skipped: $e');
             }
 
-            postEvent('waitForCoverageCollection', {
-              'mainIsolateId': Service.getIsolateId(Isolate.current),
-            });
-
             final testCompleter = Completer<void>();
+
+            registerExtension('ext.patrol.coverageReady', (
+              method,
+              parameters,
+            ) async {
+              return ServiceExtensionResponse.result(jsonEncode({
+                'mainIsolateId': Service.getIsolateId(Isolate.current),
+              }));
+            });
 
             registerExtension('ext.patrol.markTestCompleted', (
               method,

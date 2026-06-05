@@ -213,46 +213,54 @@ class CoverageTool {
     required Set<String> packages,
     required VMConnectionDetails connectionDetails,
   }) async {
-    final result = <String, coverage.HitMap>{};
-    final coverageReadyForCollection = Completer<Event?>();
     final serviceClient = await vmServiceConnectUri(
       connectionDetails.webSocketUri.toString(),
     );
     _disposeScope.addDispose(serviceClient.dispose);
 
-    await serviceClient.streamListen('Extension');
-    unawaited(
-      serviceClient.onDone.then((_) {
-        if (!coverageReadyForCollection.isCompleted) {
-          coverageReadyForCollection.complete(null);
+    // Poll for ext.patrol.coverageReady service extension.
+    // Unlike postEvent (fire-and-forget), registered extensions are
+    // discoverable via isolate.extensionRPCs after the fact.
+    String? mainIsolateId;
+    final deadline = DateTime.now().add(const Duration(seconds: 15));
+    while (DateTime.now().isBefore(deadline)) {
+      try {
+        final vm = await serviceClient.getVM();
+        for (final isolateRef in vm.isolates ?? <IsolateRef>[]) {
+          final isolate = await serviceClient.getIsolate(isolateRef.id!);
+          if (isolate.extensionRPCs?.contains('ext.patrol.coverageReady') ??
+              false) {
+            final response = await serviceClient.callServiceExtension(
+              'ext.patrol.coverageReady',
+              isolateId: isolateRef.id,
+            );
+            mainIsolateId = response.json?['mainIsolateId'] as String?;
+            break;
+          }
         }
-      }),
-    );
-    unawaited(
-      serviceClient.onExtensionEvent
-          .where((event) => event.extensionKind == 'waitForCoverageCollection')
-          .first
-          .then(coverageReadyForCollection.complete),
-    );
-    final event = await coverageReadyForCollection.future.timeout(
-      const Duration(seconds: 15),
-      onTimeout: () {
-        _logger.warn('Timed out waiting for waitForCoverageCollection event');
-        return null;
-      },
-    );
-    if (event == null) {
+      } on Exception {
+        // VM might not be ready yet
+      }
+      if (mainIsolateId != null) {
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (mainIsolateId == null) {
+      _logger.warn('ext.patrol.coverageReady not found within 15s');
       await serviceClient.dispose();
       return {};
     }
 
-    result.merge(
-      await _collectAndMarkTestCompleted(
-        connectionDetails: connectionDetails,
-        packages: packages,
-        mainIsolateId: event.extensionData!.data['mainIsolateId'] as String,
-      ),
-    );
+    final result = <String, coverage.HitMap>{}
+      ..merge(
+        await _collectAndMarkTestCompleted(
+          connectionDetails: connectionDetails,
+          packages: packages,
+          mainIsolateId: mainIsolateId,
+        ),
+      );
     await serviceClient.dispose();
 
     return result;
