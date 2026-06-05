@@ -271,13 +271,32 @@ class CoverageTool {
     required Set<String> packages,
     required String mainIsolateId,
   }) async {
-    final data = await coverage.collect(
-      connectionDetails.uri,
-      false,
-      false,
-      false,
-      packages,
+    final service = await vmServiceConnectUri(
+      connectionDetails.webSocketUri.toString(),
     );
+    final cleanupTimer = Timer(const Duration(seconds: 30), () {
+      _logger.warn('coverage.collect() timed out after 30s, closing connection');
+      service.dispose();
+    });
+    Map<String, dynamic> data;
+    try {
+      data = await coverage.collect(
+        connectionDetails.uri,
+        false,
+        false,
+        false,
+        packages,
+        serviceOverrideForTesting: service,
+      );
+      cleanupTimer.cancel();
+    } on Exception catch (e) {
+      cleanupTimer.cancel();
+      _logger.warn('coverage.collect() failed: $e');
+      try {
+        await service.dispose();
+      } catch (_) {}
+      return {};
+    }
 
     final socket =
         await io.WebSocket.connect(connectionDetails.webSocketUri.toString())
