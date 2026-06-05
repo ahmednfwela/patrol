@@ -79,14 +79,18 @@ class PatrolBinding extends LiveTestWidgetsFlutterBinding {
       if (nameOfRequestedTest == _currentDartTest) {
         if (const bool.fromEnvironment('COVERAGE_ENABLED')) {
           try {
-            final serviceInfo = await Service.getInfo();
-            final serverUri = serviceInfo.serverUri;
-            if (serverUri != null) {
-              final infoFile = io.File('/tmp/patrol_vm_service.json');
-              await infoFile.writeAsString(
-                jsonEncode({'uri': serverUri.toString()}),
-              );
-              logger('Wrote VM service URI to ${infoFile.path}');
+            try {
+              final serviceInfo = await Service.getInfo();
+              final serverUri = serviceInfo.serverUri;
+              if (serverUri != null) {
+                final infoFile = io.File('/tmp/patrol_vm_service.json');
+                await infoFile.writeAsString(
+                  jsonEncode({'uri': serverUri.toString()}),
+                );
+                logger('Wrote VM service URI to ${infoFile.path}');
+              }
+            } catch (e) {
+              logger('VM service info file write skipped: $e');
             }
 
             postEvent('waitForCoverageCollection', {
