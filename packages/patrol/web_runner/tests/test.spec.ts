@@ -3,8 +3,6 @@ import { initialise } from "./initialise"
 import { logger } from "./logger"
 import { exposePatrolPlatformHandler } from "./patrolPlatformHandler"
 import { PatrolTestEntry } from "./types"
-import CoverageReport from "monocart-coverage-reports"
-
 const tests: PatrolTestEntry[] = process.env.PATROL_TESTS ? JSON.parse(process.env.PATROL_TESTS) : []
 if (tests.length === 0) {
   logger.error("PATROL_TESTS env is empty")
@@ -14,13 +12,17 @@ const debuggerPort = process.env.PATROL_DEBUGGER_PORT
 const collectCoverage = !!process.env.PATROL_WEB_COVERAGE
 const coverageDir = process.env.PATROL_WEB_COVERAGE_DIR || "coverage"
 
-const mcr = collectCoverage
-  ? new CoverageReport({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mcr: any = null
+if (collectCoverage) {
+  import("monocart-coverage-reports").then(mod => {
+    mcr = new mod.default({
       outputDir: coverageDir,
       reports: ["lcovonly"],
       name: "patrol_lcov",
     })
-  : null
+  })
+}
 
 export const patrolTest = base.extend({
   page: async ({ page: defaultPage }, use) => {
