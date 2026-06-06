@@ -28,6 +28,11 @@ export async function initialise(page: Page) {
       { timeout: initTimeout },
     )
 
+    // Give DWDS 2s to call $dartRunMain itself (avoids double-init race)
+    await page.waitForFunction(() => !!window.$dartMainExecuted, { timeout: 2000 }).catch(() => {
+      // DWDS didn't call it within 2s — we need to do it manually
+    })
+
     const dartMainAlreadyRan = await page.evaluate(() => !!window.$dartMainExecuted)
     if (!dartMainAlreadyRan) {
       logger.info("DWDS did not call $dartRunMain — invoking it manually")

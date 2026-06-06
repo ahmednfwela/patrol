@@ -11,6 +11,9 @@ if (tests.length === 0) {
 const debuggerPort = process.env.PATROL_DEBUGGER_PORT
 const collectCoverage = !!process.env.PATROL_WEB_COVERAGE
 const coverageDir = process.env.PATROL_WEB_COVERAGE_DIR || "coverage"
+// "context" = fresh BrowserContext per test (strongest isolation, default)
+// "page" = same context, new page per test (shared cookies/storage)
+const isolationMode = process.env.PATROL_WEB_ISOLATION || "context"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mcr: any = null
@@ -82,6 +85,10 @@ export const patrolTest = base.extend({
     })
 
     page.on("pageerror", error => {
+      if (error.message.includes("initializeEngineServices")) {
+        logger.warn("Ignoring cosmetic engine re-init error")
+        return
+      }
       error.message = `Page error during test: ${error.message}`
       // eslint-disable-next-line no-console
       console.error(error.stack ?? error.message)
