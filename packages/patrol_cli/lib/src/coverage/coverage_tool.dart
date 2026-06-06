@@ -274,8 +274,8 @@ class CoverageTool {
     final service = await vmServiceConnectUri(
       connectionDetails.webSocketUri.toString(),
     );
-    final cleanupTimer = Timer(const Duration(seconds: 10), () {
-      _logger.warn('coverage.collect() timed out after 10s, closing connection');
+    final cleanupTimer = Timer(const Duration(seconds: 5), () {
+      _logger.warn('coverage.collect() timed out after 5s, closing connection');
       service.dispose();
     });
     Map<String, dynamic> data;
