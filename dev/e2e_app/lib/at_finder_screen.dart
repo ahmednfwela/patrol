@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:e2e_app/keys.dart';
 import 'package:flutter/material.dart';
 
@@ -11,39 +9,8 @@ class AtFinderScreen extends StatefulWidget {
 }
 
 class _AtFinderScreenState extends State<AtFinderScreen> {
-  var _isFirstItemVisible = false;
-  var _isSecondItemVisible = false;
   var _firstItemTapped = 0;
   var _secondItemTapped = 0;
-
-  @override
-  void initState() {
-    super.initState();
-
-    unawaited(
-      Future<void>.delayed(const Duration(seconds: 1)).then((_) {
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _isFirstItemVisible = true;
-        });
-      }),
-    );
-
-    unawaited(
-      Future<void>.delayed(const Duration(seconds: 3)).then((_) {
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _isSecondItemVisible = true;
-        });
-      }),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,22 +18,20 @@ class _AtFinderScreenState extends State<AtFinderScreen> {
       appBar: AppBar(title: const Text('at() finder')),
       body: ListView(
         children: [
-          if (_isFirstItemVisible)
-            AtFinderItem(
-              onTap: () {
-                setState(() {
-                  _firstItemTapped++;
-                });
-              },
-            ),
-          if (_isSecondItemVisible)
-            AtFinderItem(
-              onTap: () {
-                setState(() {
-                  _secondItemTapped++;
-                });
-              },
-            ),
+          AtFinderItem(
+            onTap: () {
+              setState(() {
+                _firstItemTapped++;
+              });
+            },
+          ),
+          AtFinderItem(
+            onTap: () {
+              setState(() {
+                _secondItemTapped++;
+              });
+            },
+          ),
           if (_secondItemTapped > 0)
             Text(
               'Second item tapped $_secondItemTapped',
