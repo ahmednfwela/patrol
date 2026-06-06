@@ -145,13 +145,15 @@ export const patrolTest = base.extend<
     await use(page)
     if (coverageReporter) {
       const entries = await page.coverage.stopJSCoverage()
-      // Debug: check if source text includes sourceMappingURL
-      for (const entry of entries.slice(0, 3)) {
-        const hasSource = !!entry.source
-        const hasSourceMap = entry.source?.includes("sourceMappingURL") ?? false
-        // eslint-disable-next-line no-console
-        console.log(`[MCR-DEBUG] ${entry.url}: source=${hasSource}, sourceMapURL=${hasSourceMap}, sourceLen=${entry.source?.length ?? 0}`)
-      }
+      // Debug: write source map info to file for investigation
+      const fs = await import("fs")
+      const debugLines = entries.slice(0, 5).map(e => {
+        const hasSource = !!e.source
+        const hasSM = e.source?.includes("sourceMappingURL") ?? false
+        const smMatch = e.source?.match(/\/\/[#@]\s*sourceMappingURL=(.+)/)
+        return `${e.url}: source=${hasSource} (${e.source?.length ?? 0} bytes), sourceMappingURL=${hasSM} -> ${smMatch?.[1] ?? "none"}`
+      })
+      fs.writeFileSync(`${coverageDir}/debug-sourcemap.txt`, debugLines.join("\n"))
       await coverageReporter.add(entries)
     }
 
