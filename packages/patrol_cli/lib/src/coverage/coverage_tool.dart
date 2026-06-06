@@ -253,19 +253,20 @@ class CoverageTool {
       return {};
     }
 
-    try {
-      final result = <String, coverage.HitMap>{}
-        ..merge(
-          await _collectAndMarkTestCompleted(
-            connectionDetails: connectionDetails,
-            packages: packages,
-            mainIsolateId: mainIsolateId,
-          ),
-        );
-      return result;
-    } finally {
-      await serviceClient.dispose();
-    }
+    // Dispose the polling connection BEFORE collecting coverage.
+    // markTestCompleted (inside _collectAndMarkTestCompleted) unblocks the
+    // binding, which triggers XCTest to launch the next test. If this
+    // connection is still open at that point, terminate() fails.
+    await serviceClient.dispose();
+
+    return <String, coverage.HitMap>{}
+      ..merge(
+        await _collectAndMarkTestCompleted(
+          connectionDetails: connectionDetails,
+          packages: packages,
+          mainIsolateId: mainIsolateId,
+        ),
+      );
   }
 
   Future<Map<String, coverage.HitMap>> _collectAndMarkTestCompleted({
