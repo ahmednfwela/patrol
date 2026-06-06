@@ -72,6 +72,7 @@ export const patrolTest = base.extend<
       outputDir: coverageDir,
       reports: ["v8", "lcovonly"],
       name: "patrol_lcov",
+      logging: "debug",
       entryFilter: (entry: { url: string }) => {
         if (defaultEntryExcludes.test(entry.url)) return false
         if (customFilter) return new RegExp(customFilter).test(entry.url)
