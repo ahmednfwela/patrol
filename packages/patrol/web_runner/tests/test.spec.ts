@@ -1,4 +1,4 @@
-import { chromium, test as base } from "@playwright/test"
+import { type BrowserContext, type Page, chromium, test as base } from "@playwright/test"
 import { initialise } from "./initialise"
 import { logger } from "./logger"
 import { exposePatrolPlatformHandler } from "./patrolPlatformHandler"
@@ -27,9 +27,55 @@ if (collectCoverage) {
   })
 }
 
-export const patrolTest = base.extend({
-  page: async ({ page: defaultPage }, use) => {
-    let page = defaultPage
+async function setupPage(page: Page) {
+  page.on("console", message => {
+    const text = message.text()
+    if (text.startsWith("PATROL_LOG")) {
+      // eslint-disable-next-line no-console
+      console.log(text)
+      return
+    }
+    // eslint-disable-next-line no-console
+    console.log(`Playwright: ${text}`)
+  })
+
+  page.on("pageerror", error => {
+    if (error.message.includes("initializeEngineServices")) {
+      logger.warn("Ignoring cosmetic engine re-init error")
+      return
+    }
+    error.message = `Page error during test: ${error.message}`
+    // eslint-disable-next-line no-console
+    console.error(error.stack ?? error.message)
+  })
+
+  await page.addInitScript(() => {
+    window.__patrol__isInitialised = true
+  })
+
+  await exposePatrolPlatformHandler(page)
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+
+  await page.evaluate(() => {
+    window.__patrol__isInitialised = true
+  })
+
+  await initialise(page)
+}
+
+export const patrolTest = base.extend<object, { sharedContext: BrowserContext }>({
+  sharedContext: [async ({ browser }, use) => {
+    if (isolationMode === "page") {
+      const context = await browser.newContext()
+      await use(context)
+      await context.close()
+    } else {
+      await use(null as unknown as BrowserContext)
+    }
+  }, { scope: "worker" }],
+
+  page: async ({ page: defaultPage, sharedContext }, use) => {
+    let page: Page = defaultPage
     let cdpBrowser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | null = null
 
     if (debuggerPort) {
@@ -58,6 +104,10 @@ export const patrolTest = base.extend({
       })
 
       page.on("pageerror", error => {
+        if (error.message.includes("initializeEngineServices")) {
+          logger.warn("Ignoring cosmetic engine re-init error")
+          return
+        }
         error.message = `Page error during test: ${error.message}`
         // eslint-disable-next-line no-console
         console.error(error.stack ?? error.message)
@@ -72,53 +122,23 @@ export const patrolTest = base.extend({
       return
     }
 
-    page.on("console", message => {
-      const text = message.text()
-      if (text.startsWith("PATROL_LOG")) {
-        // eslint-disable-next-line no-console
-        console.log(text)
-        return
-      }
+    // "page" mode: new page from shared context (shared cookies/storage)
+    // "context" mode: use Playwright's default fresh context per test
+    if (isolationMode === "page" && sharedContext) {
+      page = await sharedContext.newPage()
+    }
 
-      // eslint-disable-next-line no-console
-      console.log(`Playwright: ${text}`)
-    })
-
-    page.on("pageerror", error => {
-      if (error.message.includes("initializeEngineServices")) {
-        logger.warn("Ignoring cosmetic engine re-init error")
-        return
-      }
-      error.message = `Page error during test: ${error.message}`
-      // eslint-disable-next-line no-console
-      console.error(error.stack ?? error.message)
-    })
-
-    // Register an init script that runs at the very start of every page load,
-    // BEFORE any Flutter / WASM code executes.  This guarantees that
-    // __patrol__isInitialised is true even if the page reloads during WASM
-    // bootstrapping (service-worker activation, Flutter engine reinit, etc.).
-    await page.addInitScript(() => {
-      window.__patrol__isInitialised = true
-    })
-
-    await exposePatrolPlatformHandler(page)
-
-    // Standard mode: navigate to the web-server URL
-    await page.goto("/", { waitUntil: "domcontentloaded" })
-
-    // Inject immediately upon load just to ensure tests have it right now
-    await page.evaluate(() => {
-      window.__patrol__isInitialised = true
-    })
-
-    await initialise(page)
+    await setupPage(page)
 
     if (collectCoverage) await page.coverage.startJSCoverage()
     await use(page)
     if (collectCoverage && mcr) {
       const entries = await page.coverage.stopJSCoverage()
       await mcr.add(entries)
+    }
+
+    if (isolationMode === "page") {
+      await page.close()
     }
   },
 })
