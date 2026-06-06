@@ -57,6 +57,7 @@ void main() {
 
     await $(#atFinderScreenButton).scrollTo().tap();
 
+    await $.waitUntilVisible($(#atFinderItem).first);
     expect($(#atFinderItem).evaluate().length, greaterThan(0));
   });
 
