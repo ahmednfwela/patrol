@@ -551,6 +551,7 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
           hideTestSteps: hideTestSteps,
           clearTestSteps: clearTestSteps,
           coverageEnabled: coverageEnabled,
+          webIsolation: stringArg('web-isolation') ?? 'context',
         );
       case TargetPlatform.linux:
       case TargetPlatform.windows:
@@ -607,6 +608,17 @@ See https://github.com/leancodepl/patrol/issues/1316 to learn more.
             'If unset, matches the current package name.',
         valueHelp: 'package-name-regexp',
         splitCommas: false,
+      )
+      ..addOption(
+        'web-isolation',
+        help:
+            'Browser isolation strategy for web tests.\n'
+            '"context" creates a fresh BrowserContext per test (strongest '
+            'isolation — separate cookies, storage, JS globals).\n'
+            '"page" reuses a shared context with a new page per test '
+            '(shared cookies/storage — useful for OAuth flows).',
+        allowed: ['context', 'page'],
+        defaultsTo: 'context',
       );
   }
 }

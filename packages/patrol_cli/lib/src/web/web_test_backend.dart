@@ -73,6 +73,7 @@ class WebTestBackend {
     bool hideTestSteps = false,
     bool clearTestSteps = false,
     bool coverageEnabled = false,
+    String webIsolation = 'context',
   }) async {
     _logger
       ..detail('Starting web test execution...')
@@ -100,6 +101,7 @@ class WebTestBackend {
         hideTestSteps: hideTestSteps,
         clearTestSteps: clearTestSteps,
         coverageEnabled: coverageEnabled,
+        webIsolation: webIsolation,
       );
     } finally {
       // Clean up Flutter process gracefully
@@ -489,6 +491,7 @@ class WebTestBackend {
     required bool clearTestSteps,
     String? debuggerPort,
     bool coverageEnabled = false,
+    String webIsolation = 'context',
   }) async {
     _logger.info('Running Playwright tests against: $baseUrl');
     final completer = Completer<void>();
@@ -521,6 +524,7 @@ class WebTestBackend {
                 'PATROL_DEBUGGER_PORT': ?debuggerPort,
                 if (coverageEnabled)
                   'PATROL_WEB_COVERAGE': 'true',
+                'PATROL_WEB_ISOLATION': webIsolation,
                 'PATROL_TEST_RESULTS_DIR': testResultsDir,
                 'PATROL_TEST_REPORT_DIR': testReportDir,
                 if (options.retries != null)
