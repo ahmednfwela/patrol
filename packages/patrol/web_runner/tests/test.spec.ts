@@ -68,8 +68,14 @@ export const patrolTest = base.extend<
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     const reporter: CoverageReporter = new (mod.default as any)({
       outputDir: coverageDir,
-      reports: ["lcovonly"],
+      reports: ["v8", "lcovonly"],
       name: "patrol_lcov",
+      entryFilter: (entry: { url: string }) =>
+        /packages\/(patrol|patrol_finders)\//.test(entry.url),
+      sourceFilter: (sourcePath: string) =>
+        /packages\/(patrol|patrol_finders)\//.test(sourcePath),
+      sourcePath: (filePath: string) =>
+        filePath.replace(/^.*?(packages\/)/, "$1"),
     })
     await use(reporter)
     await reporter.generate()
