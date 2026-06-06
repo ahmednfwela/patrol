@@ -109,9 +109,9 @@ export const patrolTest = base.extend({
 
     if (collectCoverage) await page.coverage.startJSCoverage()
     await use(page)
-    if (collectCoverage) {
+    if (collectCoverage && mcr) {
       const entries = await page.coverage.stopJSCoverage()
-      saveCoverageEntries(entries)
+      await mcr.add(entries)
     }
   },
 })
@@ -137,10 +137,12 @@ for (const { name, skip, tags } of tests) {
   })
 }
 
-patrolTest.afterAll(async () => {
-  if (mcr) {
-    await mcr.generate()
-    logger.info("Generated LCOV coverage report in %s", coverageDir)
-  }
-})
+if (collectCoverage) {
+  process.on("beforeExit", async () => {
+    if (mcr) {
+      await mcr.generate()
+      logger.info("Generated LCOV coverage report in %s", coverageDir)
+    }
+  })
+}
 
