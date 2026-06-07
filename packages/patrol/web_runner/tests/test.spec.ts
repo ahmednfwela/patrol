@@ -153,6 +153,7 @@ export const patrolTest = base.extend<
         const smMatch = e.source?.match(/\/\/[#@]\s*sourceMappingURL=(.+)/)
         return `${e.url}: source=${hasSource} (${e.source?.length ?? 0} bytes), sourceMappingURL=${hasSM} -> ${smMatch?.[1] ?? "none"}`
       })
+      fs.mkdirSync(coverageDir, { recursive: true })
       fs.writeFileSync(`${coverageDir}/debug-sourcemap.txt`, debugLines.join("\n"))
       await coverageReporter.add(entries)
     }
