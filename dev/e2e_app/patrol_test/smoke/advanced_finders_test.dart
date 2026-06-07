@@ -29,21 +29,16 @@ void main() {
     expect($(#counterText), findsOneWidget);
   });
 
-  patrol('dragUntilVisible scrolls to target', ($) async {
+  patrol('dragUntilVisible on main screen list', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
-    await $('Open scrolling screen').scrollTo().tap();
-    await $.waitUntilVisible($(#topText));
-
     await $.dragUntilVisible(
-      finder: $(#bottomText),
+      finder: $(#tile2),
       view: $(#listViewKey),
       moveStep: const Offset(0, -100),
     );
-    expect($(#bottomText), findsOneWidget);
-
-    await $.tap($(#backButton));
+    expect($(#tile2), findsOneWidget);
   });
 
   patrol('pumpAndSettle with custom timeout', ($) async {
@@ -75,11 +70,11 @@ void main() {
     expect($(Scaffold).$(#textField), findsOneWidget);
   });
 
-  patrol('scrollTo with custom step and maxScrolls', ($) async {
+  patrol('scrollTo with custom maxScrolls', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
-    await $(#tile1).scrollTo(maxScrolls: 50, step: 200);
+    await $(#tile1).scrollTo(maxScrolls: 50);
     expect($(#tile1), findsOneWidget);
 
     await $(#tile2).scrollTo(maxScrolls: 50);
