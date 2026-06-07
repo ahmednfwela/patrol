@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../common.dart';
 
-final _isMobile = Platform.isAndroid || Platform.isIOS;
-
 void main() {
-  patrol('pressHome and openApp lifecycle', skip: !_isMobile, ($) async {
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    return;
+  }
+
+  patrol('pressHome and openApp lifecycle', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
@@ -20,7 +22,7 @@ void main() {
     await $.waitUntilVisible($(#counterText));
   });
 
-  patrol('tapAt screen coordinates', skip: !_isMobile, ($) async {
+  patrol('tapAt screen coordinates', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
@@ -28,7 +30,7 @@ void main() {
     await $.waitUntilVisible($(#counterText));
   });
 
-  patrol('swipe gesture on scrolling screen', skip: !_isMobile, ($) async {
+  patrol('swipe gesture on scrolling screen', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
@@ -43,7 +45,7 @@ void main() {
     await $.tap($(#backButton));
   });
 
-  patrol('pullToRefresh on scrolling screen', skip: !_isMobile, ($) async {
+  patrol('pullToRefresh on scrolling screen', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
@@ -57,14 +59,14 @@ void main() {
     await $.tap($(#backButton));
   });
 
-  patrol('getOsVersion returns positive integer', skip: !_isMobile, ($) async {
+  patrol('getOsVersion returns positive integer', ($) async {
     await createApp($);
 
     final osVersion = await $.platform.mobile.getOsVersion();
     expect(osVersion, greaterThan(0));
   });
 
-  patrol('isVirtualDevice returns true on emulator', skip: !_isMobile, ($) async {
+  patrol('isVirtualDevice returns true on emulator', ($) async {
     await createApp($);
 
     final isVirtual = await $.platform.mobile.isVirtualDevice();
