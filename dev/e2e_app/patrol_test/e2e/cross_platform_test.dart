@@ -180,6 +180,31 @@ void main() {
     expect($(#counterText).text, '-5');
   });
 
+  // --- scrollUntilExists ---
+
+  patrol('scrollUntilExists finds off-screen widget', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    await $.scrollUntilExists(finder: $(#tile2));
+    expect($(#tile2).exists, isTrue);
+  });
+
+  // --- enterText variations ---
+
+  patrol('enterText with noSettle policy', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    await $.enterText(
+      $(#textField),
+      'no settle text',
+      settlePolicy: SettlePolicy.noSettle,
+    );
+    await $.pump(const Duration(milliseconds: 300));
+    expect($('no settle text'), findsOneWidget);
+  });
+
   // --- Navigation ---
 
   patrol('navigate to at-finder screen', ($) async {

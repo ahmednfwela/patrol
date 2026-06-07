@@ -72,4 +72,23 @@ void main() {
     final isVirtual = await $.platform.mobile.isVirtualDevice();
     expect(isVirtual, isTrue);
   });
+
+  patrol('pressVolumeUp and pressVolumeDown', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    await $.platform.mobile.pressVolumeUp();
+    await $.platform.mobile.pressVolumeDown();
+  });
+
+  patrol('swipeBack navigates back', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    await $('Open scrolling screen').scrollTo().tap();
+    await $.waitUntilVisible($(#topText));
+
+    await $.platform.mobile.swipeBack();
+    await $.waitUntilVisible($(#counterText));
+  });
 }
