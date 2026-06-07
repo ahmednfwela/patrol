@@ -39,4 +39,40 @@ void main() {
 
     await $.tap($(#backButton));
   });
+
+  patrol('enableDarkMode and disableDarkMode', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    await $.platform.mobile.enableDarkMode();
+    await $.platform.mobile.disableDarkMode();
+  });
+
+  patrol('pullToRefresh on scrolling screen', ($) async {
+    await createApp($);
+    await $.waitUntilVisible($(#counterText));
+
+    await $('Open scrolling screen').scrollTo().tap();
+    await $.waitUntilVisible($(#topText));
+
+    await $.platform.mobile.pullToRefresh();
+    await $.waitUntilVisible($(#refreshText));
+    expect($('Some text that appeared after refresh'), findsOneWidget);
+
+    await $.tap($(#backButton));
+  });
+
+  patrol('getOsVersion returns positive integer', ($) async {
+    await createApp($);
+
+    final osVersion = await $.platform.mobile.getOsVersion();
+    expect(osVersion, greaterThan(0));
+  });
+
+  patrol('isVirtualDevice returns true on emulator', ($) async {
+    await createApp($);
+
+    final isVirtual = await $.platform.mobile.isVirtualDevice();
+    expect(isVirtual, isTrue);
+  });
 }
