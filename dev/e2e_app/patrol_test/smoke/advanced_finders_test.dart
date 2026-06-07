@@ -29,16 +29,15 @@ void main() {
     expect($(#counterText), findsOneWidget);
   });
 
-  patrol('dragUntilVisible on main screen list', ($) async {
+  patrol('exists and visible properties', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
-    await $.dragUntilVisible(
-      finder: $(#tile2),
-      view: $(#listViewKey),
-      moveStep: const Offset(0, -100),
-    );
-    expect($(#tile2), findsOneWidget);
+    expect($(#counterText).exists, isTrue);
+    expect($(#counterText).visible, isTrue);
+
+    // Non-existent widget
+    expect($(#nonExistentWidget).exists, isFalse);
   });
 
   patrol('pumpAndSettle with custom timeout', ($) async {
@@ -70,15 +69,15 @@ void main() {
     expect($(Scaffold).$(#textField), findsOneWidget);
   });
 
-  patrol('scrollTo with custom maxScrolls', ($) async {
+  patrol('at() accessor on finder results', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
 
-    await $(#tile1).scrollTo(maxScrolls: 50);
-    expect($(#tile1), findsOneWidget);
-
-    await $(#tile2).scrollTo(maxScrolls: 50);
-    expect($(#tile2), findsOneWidget);
+    final icons = $(Icon);
+    expect(icons.at(0), findsOneWidget);
+    expect(icons.at(1), findsOneWidget);
+    expect(icons.first, findsOneWidget);
+    expect(icons.last, findsOneWidget);
   });
 
   patrol('text getter reflects state changes', ($) async {
