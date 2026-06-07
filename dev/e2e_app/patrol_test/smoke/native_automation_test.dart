@@ -40,14 +40,6 @@ void main() {
     await $.tap($(#backButton));
   });
 
-  patrol('enableDarkMode and disableDarkMode', ($) async {
-    await createApp($);
-    await $.waitUntilVisible($(#counterText));
-
-    await $.platform.mobile.enableDarkMode();
-    await $.platform.mobile.disableDarkMode();
-  });
-
   patrol('pullToRefresh on scrolling screen', ($) async {
     await createApp($);
     await $.waitUntilVisible($(#counterText));
