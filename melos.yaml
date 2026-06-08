@@ -3,6 +3,16 @@ repository: https://github.com/ahmednfwela/patrol
 packages:
   - packages/**
 
+command:
+  version:
+    message: 'chore: release {new_package_versions}'
+    includeCommitId: true
+    workspaceChangelog: true
+    linkToCommits: true
+  publish:
+    hooks:
+      pre: melos run analyze
+
 scripts:
   lint:all:
     run: melos run analyze && melos run format-check
