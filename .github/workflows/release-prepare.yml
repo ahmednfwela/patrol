@@ -1,16 +1,15 @@
-name: Publish to pub.dev
+name: Prepare Release
 
 on:
-  push:
-    tags:
-      - '*-v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
   id-token: write
 
 jobs:
-  publish:
+  version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,5 +22,9 @@ jobs:
 
       - uses: bluefireteam/melos-action@v3
         with:
-          publish: true
-          create-release: true
+          run-versioning: true
+          publish-dry-run: true
+          create-pr: true
+          tag: true
+          git-email: ahmednfwela@digrum.com
+          git-name: ahmednfwela
