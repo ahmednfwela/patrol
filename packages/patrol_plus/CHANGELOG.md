@@ -1,3 +1,9 @@
+## 5.0.0
+
+- Fork of `patrol` as `patrol_plus` for independent pub.dev publishing.
+- Bump version to 5.0.0 to align with the patrol_plus ecosystem.
+- Depends on `patrol_finders_plus` and `patrol_log_plus`.
+
 ## 4.6.1
 
 - Fix changelog

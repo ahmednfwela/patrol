@@ -1,3 +1,10 @@
+## 5.0.0
+
+- Fork of `patrol_finders` as `patrol_finders_plus` for independent pub.dev publishing.
+- Bump version to 5.0.0 to align with the patrol_plus ecosystem.
+- Fix issues with `enterText()`. (#2202, #2111)
+- Add `hideKeyboard` optional argument to `enterText()` method.
+
 ## Unreleased
 
 - Fix issues with `enterText()`. (#2202, #2111)

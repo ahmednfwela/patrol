@@ -1,3 +1,8 @@
+## 5.0.0
+
+- Fork of `patrol_log` as `patrol_log_plus` for independent pub.dev publishing.
+- Bump version to 5.0.0 to align with the patrol_plus ecosystem.
+
 ## 0.9.0
 
 - **Breaking:** Move `PatrolLogReader` to a separate `package:patrol_log/patrol_log_reader.dart` export, removing the transitive `dart:io` dependency from the main barrel file.

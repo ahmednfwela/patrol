@@ -1,3 +1,10 @@
+## 5.0.0
+
+- Fork of `patrol_cli` as `patrol_cli_plus` for independent pub.dev publishing.
+- Bump version to 5.0.0 to align with the patrol_plus ecosystem.
+- Depends on `adb_plus` and `patrol_log_plus`.
+- Executable renamed to `patrol_plus`.
+
 ## 4.4.0
 
 - Fix iOS Simulator test crash on Xcode 26.4+ caused by missing platform frameworks path in xctestrun.

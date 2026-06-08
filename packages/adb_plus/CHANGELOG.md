@@ -1,3 +1,8 @@
+## 5.0.0
+
+- Fork of `adb` as `adb_plus` for independent pub.dev publishing.
+- Bump version to 5.0.0 to align with the patrol_plus ecosystem.
+
 ## 0.6.0
 
 - Bump `custom_lint` to `0.7.0` and `leancode_lint` to `14.3.0`. (#2574)
